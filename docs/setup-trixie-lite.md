@@ -12,6 +12,8 @@ Run:
 sudo ./scripts/install-trixie-lite.sh
 ```
 
+The installer now prompts for console resolution and rotation. On current Trixie images it applies forced HDMI mode and rotation through `/boot/firmware/cmdline.txt` with a `video=HDMI-A-1:...` kernel argument instead of relying on legacy `display_rotate`.
+
 This installs:
 
 - `micro`

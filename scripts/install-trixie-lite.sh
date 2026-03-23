@@ -47,40 +47,81 @@ sudo_if_needed() {
 # Interactive prompts - get user preferences
 # -----------------------------------------------------------------------------
 
-# Map common resolutions to hdmi_mode values
+# Map common resolutions to hdmi_mode values (DMT modes)
 get_hdmi_mode() {
   case "$1" in
     640x480)    echo "1" ;;
     800x600)    echo "9" ;;
+    1024x600)   echo "51" ;;
     1024x768)   echo "16" ;;
-    1280x720)    echo "82" ;;
-    1280x1024)   echo "35" ;;
+    1280x720)   echo "82" ;;
+    1280x1024)  echo "35" ;;
     1920x1080)  echo "86" ;;
     *)          echo "" ;;
   esac
 }
 
-# Probe current connected HDMI resolution
-probe_resolution() {
-  for conn in /sys/class/drm/card*-HDMI-1/status; do
-    if [ -f "$conn" ] && grep -q "connected" "$conn" 2>/dev/null; then
-      for mode_file in /sys/class/drm/card*/HDMI-1/mode; do
-        if [ -f "$mode_file" ]; then
-          mode=$(cat "$mode_file" 2>/dev/null)
-          if [ -n "$mode" ]; then
-            width=$(echo "$mode" | cut -dx -f1)
-            height=$(echo "$mode" | cut -dx -f2)
-            hdmi_mode=$(get_hdmi_mode "${width}x${height}")
-            if [ -n "$hdmi_mode" ]; then
-              echo "$hdmi_mode"
-              return
-            fi
+# Map hdmi_mode values back to resolution strings
+hdmi_mode_to_resolution() {
+  case "$1" in
+    1)   echo "640x480" ;;
+    9)   echo "800x600" ;;
+    51)  echo "1024x600" ;;
+    16)  echo "1024x768" ;;
+    82)  echo "1280x720" ;;
+    35)  echo "1280x1024" ;;
+    86)  echo "1920x1080" ;;
+    *)   echo "1280x720" ;;
+  esac
+}
+
+probe_drm_resolution() {
+  for status_file in /sys/class/drm/card*-HDMI-A-*/status; do
+    [ -f "$status_file" ] || continue
+    if grep -q "^connected$" "$status_file" 2>/dev/null; then
+      mode_file=${status_file%/status}/modes
+      if [ -f "$mode_file" ]; then
+        preferred=$(sed -n '1p' "$mode_file" 2>/dev/null || true)
+        if [ -n "$preferred" ]; then
+          hdmi_mode=$(get_hdmi_mode "$preferred")
+          if [ -n "$hdmi_mode" ]; then
+            echo "$hdmi_mode"
+            return 0
           fi
         fi
-      done
+      fi
     fi
   done
-  
+  return 1
+}
+
+probe_framebuffer_resolution() {
+  if command -v fbset >/dev/null 2>&1; then
+    geometry=$(fbset -s 2>/dev/null | awk '/geometry/ { print $2 "x" $3; exit }')
+    if [ -n "$geometry" ]; then
+      hdmi_mode=$(get_hdmi_mode "$geometry")
+      if [ -n "$hdmi_mode" ]; then
+        echo "$hdmi_mode"
+        return 0
+      fi
+    fi
+  fi
+  return 1
+}
+
+probe_resolution() {
+  detected=$(probe_drm_resolution || true)
+  if [ -n "$detected" ]; then
+    echo "$detected"
+    return
+  fi
+
+  detected=$(probe_framebuffer_resolution || true)
+  if [ -n "$detected" ]; then
+    echo "$detected"
+    return
+  fi
+
   if command -v tvservice >/dev/null 2>&1; then
     preferred=$(tvservice -p 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | head -1)
     if [ -n "$preferred" ]; then
@@ -141,6 +182,7 @@ prompt_console_settings() {
   echo ""
   
   detected=$(probe_resolution)
+  DETECTED_RESOLUTION=$detected
   default_res=${detected:-82}
   
   printf "Console font size (ter-v32n, ter-v24n, VGA8x16) [ter-v32n]: "
@@ -153,6 +195,7 @@ prompt_console_settings() {
   
   echo ""
   echo "HDMI resolution (current: ${default_res:-unknown}):"
+  echo "  51 = 1024x600 (WriterDeck panel)"
   echo "  82 = 1280x720 (720p)"
   echo "  86 = 1920x1080 (1080p)"
   echo "  0  = skip (use current)"
@@ -190,6 +233,64 @@ prompt_console_settings() {
     n|N|no|No) exit 0 ;;
     *) ;;
   esac
+}
+
+set_config_key() {
+  config_path=$1
+  key=$2
+  value=$3
+
+  if grep -q "^${key}=" "$config_path" 2>/dev/null; then
+    sudo_if_needed sed -i "s|^${key}=.*|${key}=${value}|" "$config_path"
+  else
+    echo "${key}=${value}" | sudo_if_needed tee -a "$config_path" >/dev/null
+  fi
+}
+
+remove_config_key() {
+  config_path=$1
+  key=$2
+
+  if grep -q "^${key}=" "$config_path" 2>/dev/null; then
+    sudo_if_needed sed -i "/^${key}=/d" "$config_path"
+  fi
+}
+
+rotation_to_degrees() {
+  case "$1" in
+    1) echo "90" ;;
+    2) echo "180" ;;
+    3) echo "270" ;;
+    *) echo "" ;;
+  esac
+}
+
+configure_cmdline_video() {
+  cmdline_path=$1
+  video_arg=$2
+  current_cmdline=$(cat "$cmdline_path")
+  updated_cmdline=""
+
+  for arg in $current_cmdline; do
+    case "$arg" in
+      video=HDMI-A-1:*) ;;
+      *) updated_cmdline="${updated_cmdline}${updated_cmdline:+ }$arg" ;;
+    esac
+  done
+
+  if [ -n "$video_arg" ]; then
+    updated_cmdline="${updated_cmdline}${updated_cmdline:+ }$video_arg"
+  fi
+
+  if [ "$updated_cmdline" = "$current_cmdline" ]; then
+    return 1
+  fi
+
+  rendered_cmdline=$(mktemp)
+  printf '%s\n' "$updated_cmdline" > "$rendered_cmdline"
+  sudo_if_needed install -m 0644 "$rendered_cmdline" "$cmdline_path"
+  rm -f "$rendered_cmdline"
+  return 0
 }
 
 # -----------------------------------------------------------------------------
@@ -309,23 +410,67 @@ setup_console() {
     CONFIG_TXT=/boot/config.txt
   fi
   
+  CMDLINE_TXT=""
+  if [ -f /boot/firmware/cmdline.txt ]; then
+    CMDLINE_TXT=/boot/firmware/cmdline.txt
+  elif [ -f /boot/cmdline.txt ]; then
+    CMDLINE_TXT=/boot/cmdline.txt
+  fi
+  
   if [ -n "$CONFIG_TXT" ]; then
-    if [ "$CONSOLE_RESOLUTION" != "0" ]; then
-      if ! grep -q "^hdmi_group=2" "$CONFIG_TXT" 2>/dev/null; then
-        echo "hdmi_group=2" | sudo_if_needed tee -a "$CONFIG_TXT" >/dev/null
+    remove_config_key "$CONFIG_TXT" "display_rotate"
+
+    if [ -z "$CMDLINE_TXT" ]; then
+      if [ "$CONSOLE_RESOLUTION" != "0" ]; then
+        set_config_key "$CONFIG_TXT" "hdmi_group" "2"
+        set_config_key "$CONFIG_TXT" "hdmi_mode" "$CONSOLE_RESOLUTION"
+      else
+        remove_config_key "$CONFIG_TXT" "hdmi_group"
+        remove_config_key "$CONFIG_TXT" "hdmi_mode"
       fi
-      if ! grep -q "^hdmi_mode=$CONSOLE_RESOLUTION" "$CONFIG_TXT" 2>/dev/null; then
-        echo "hdmi_mode=$CONSOLE_RESOLUTION" | sudo_if_needed tee -a "$CONFIG_TXT" >/dev/null
-      fi
-    fi
-    
-    if [ "$CONSOLE_ROTATE" != "0" ]; then
-      if ! grep -q "^display_rotate=$CONSOLE_ROTATE" "$CONFIG_TXT" 2>/dev/null; then
-        echo "display_rotate=$CONSOLE_ROTATE" | sudo_if_needed tee -a "$CONFIG_TXT" >/dev/null
-      fi
-      log "Screen rotated by ${CONSOLE_ROTATE}°"
+    else
+      remove_config_key "$CONFIG_TXT" "hdmi_group"
+      remove_config_key "$CONFIG_TXT" "hdmi_mode"
     fi
     log "Display config updated in $CONFIG_TXT"
+  fi
+  
+  if [ "$CONSOLE_ROTATE" != "0" ]; then
+    case "$CONSOLE_ROTATE" in
+      1) log "Screen rotated 90° clockwise" ;;
+      2) log "Screen rotated 180°" ;;
+      3) log "Screen rotated 270° clockwise" ;;
+    esac
+  fi
+
+  if [ -n "$CMDLINE_TXT" ]; then
+    video_resolution=""
+    if [ "$CONSOLE_RESOLUTION" != "0" ]; then
+      video_resolution=$(hdmi_mode_to_resolution "$CONSOLE_RESOLUTION")
+    elif [ "$CONSOLE_ROTATE" != "0" ] && [ -n "${DETECTED_RESOLUTION:-}" ]; then
+      video_resolution=$(hdmi_mode_to_resolution "$DETECTED_RESOLUTION")
+    fi
+
+    video_param=""
+    if [ -n "$video_resolution" ]; then
+      video_param="video=HDMI-A-1:${video_resolution}M@60"
+      if [ "$CONSOLE_ROTATE" != "0" ]; then
+        rot_degrees=$(rotation_to_degrees "$CONSOLE_ROTATE")
+        if [ -n "$rot_degrees" ]; then
+          video_param="${video_param},rotate=${rot_degrees}"
+        fi
+      fi
+    elif [ "$CONSOLE_ROTATE" != "0" ]; then
+      log "warning: could not determine current HDMI mode; skipping rotation override"
+    fi
+
+    if configure_cmdline_video "$CMDLINE_TXT" "$video_param"; then
+      if [ -n "$video_param" ]; then
+        log "Updated kernel video mode in $CMDLINE_TXT"
+      else
+        log "Removed kernel video override from $CMDLINE_TXT"
+      fi
+    fi
   fi
 }
 
