@@ -208,11 +208,13 @@ prompt_console_settings() {
   fi
   
   echo ""
-  echo "Screen rotation:"
-  echo "  0 = normal [recommended]"
-  echo "  1 = 90 degrees clockwise"
-  echo "  2 = 180 degrees"
-  echo "  3 = 270 degrees clockwise"
+  echo "Physical screen orientation:"
+  echo "  Choose how the display is mounted right now."
+  echo "  The installer will rotate the console to match."
+  echo "  0 = mounted normally [recommended]"
+  echo "  1 = display is turned 90 degrees clockwise"
+  echo "  2 = display is upside down"
+  echo "  3 = display is turned 90 degrees anti-clockwise"
   printf "Choice [0]: "
   read -r rot_input
   if [ -z "$rot_input" ]; then
@@ -225,7 +227,7 @@ prompt_console_settings() {
   echo "Console configuration:"
   echo "  Font:      $CONSOLE_FONTSIZE"
   echo "  Resolution: $CONSOLE_RESOLUTION"
-  echo "  Rotation:  $CONSOLE_ROTATE"
+  echo "  Screen orientation: $CONSOLE_ROTATE"
   echo ""
   printf "Proceed with these settings? [Y/n]: "
   read -r confirm
