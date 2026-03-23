@@ -1,0 +1,379 @@
+#!/usr/bin/env python3
+"""WriterDeck command line tool."""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python <3.11 fallback
+    print("error: Python 3.11+ is required (tomllib missing)", file=sys.stderr)
+    sys.exit(2)
+
+DEFAULT_CONFIG_PATH = Path("/etc/writerdeck/config.toml")
+VALID_SYNC_MODES = {"single_writer", "two_way"}
+
+
+class WriterDeckError(RuntimeError):
+    """Raised when writerdeck commands cannot complete."""
+
+
+class Config:
+    def __init__(self, raw: dict):
+        self.root = Path(_read_required(raw, "paths", "root")).expanduser()
+        self.default_project = _sanitize_name(
+            _read_required(raw, "paths", "default_project"), "project"
+        )
+        self.editor_command = _read_required(raw, "editor", "command")
+        self.folder_id = _read_required(raw, "sync", "folder_id")
+        self.sync_mode = _read_required(raw, "sync", "mode")
+        self.wait_timeout_sec = _read_required(raw, "sync", "wait_timeout_sec")
+
+        if self.sync_mode not in VALID_SYNC_MODES:
+            raise WriterDeckError(
+                f"invalid sync.mode '{self.sync_mode}'. "
+                f"Expected one of: {', '.join(sorted(VALID_SYNC_MODES))}"
+            )
+
+        if not isinstance(self.wait_timeout_sec, int) or self.wait_timeout_sec <= 0:
+            raise WriterDeckError("sync.wait_timeout_sec must be a positive integer")
+
+
+class SyncthingClient:
+    def __init__(self, folder_id: str):
+        self.folder_id = folder_id
+        self.base_url = os.getenv("WD_SYNCTHING_URL", "http://127.0.0.1:8384").rstrip("/")
+        self.api_key = _find_syncthing_api_key()
+        if not self.api_key:
+            raise WriterDeckError(
+                "Syncthing API key not found. Set WD_SYNCTHING_API_KEY or ensure "
+                "~/.local/state/syncthing/config.xml exists for this user."
+            )
+
+    def status(self) -> dict:
+        return self._request("GET", "/rest/db/status", {"folder": self.folder_id})
+
+    def scan(self) -> dict:
+        return self._request("POST", "/rest/db/scan", {"folder": self.folder_id})
+
+    def _request(self, method: str, path: str, query: dict | None = None) -> dict:
+        query_string = ""
+        if query:
+            query_string = "?" + urllib.parse.urlencode(query)
+
+        req = urllib.request.Request(
+            url=f"{self.base_url}{path}{query_string}",
+            headers={"X-API-Key": self.api_key},
+            method=method,
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=10) as response:
+                body = response.read().decode("utf-8")
+        except urllib.error.URLError as exc:
+            raise WriterDeckError(f"Syncthing API request failed: {exc}") from exc
+
+        if not body:
+            return {}
+
+        try:
+            return json.loads(body)
+        except json.JSONDecodeError as exc:
+            raise WriterDeckError(f"invalid JSON from Syncthing API: {body[:120]}") from exc
+
+
+def _read_required(raw: dict, section: str, key: str):
+    section_data = raw.get(section)
+    if not isinstance(section_data, dict):
+        raise WriterDeckError(f"missing [{section}] section in config")
+
+    if key not in section_data:
+        raise WriterDeckError(f"missing required config key: {section}.{key}")
+
+    return section_data[key]
+
+
+def _load_config(path: Path) -> Config:
+    if not path.exists():
+        raise WriterDeckError(f"config file not found: {path}")
+
+    with path.open("rb") as handle:
+        raw = tomllib.load(handle)
+
+    return Config(raw)
+
+
+def _sanitize_name(value: str, kind: str) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9._-]+", "-", value.strip().lower()).strip("-._")
+    if not cleaned:
+        raise WriterDeckError(f"{kind} name cannot be empty after sanitization")
+    return cleaned
+
+
+def _timestamp_now() -> str:
+    return dt.datetime.now().strftime("%Y-%m-%d_%H%M")
+
+
+def _find_latest_markdown(root: Path) -> Path | None:
+    if not root.exists():
+        return None
+
+    files = [path for path in root.rglob("*.md") if path.is_file()]
+    if not files:
+        return None
+
+    return max(files, key=lambda path: path.stat().st_mtime)
+
+
+def _create_new_draft(root: Path, project: str, slug: str | None = None) -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    project_name = _sanitize_name(project, "project")
+    slug_name = _sanitize_name(slug or "draft", "slug")
+
+    project_dir = root / project_name
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = _timestamp_now()
+    draft_path = project_dir / f"{timestamp}_{slug_name}.md"
+    counter = 2
+    while draft_path.exists():
+        draft_path = project_dir / f"{timestamp}_{slug_name}-{counter}.md"
+        counter += 1
+
+    draft_path.touch()
+
+    return draft_path
+
+
+def _run_editor(editor_command: str, files: list[Path]) -> int:
+    cmd = shlex.split(editor_command)
+    if not cmd:
+        raise WriterDeckError("editor.command is empty")
+
+    cmd.extend(str(path) for path in files)
+    return subprocess.run(cmd, check=False).returncode
+
+
+def _print_status(status: dict, cfg: Config) -> None:
+    print(f"folder_id={cfg.folder_id}")
+    print(f"mode={cfg.sync_mode}")
+    print(f"state={status.get('state', 'unknown')}")
+    print(f"need_items={status.get('needItems', 'unknown')}")
+    print(f"need_bytes={status.get('needBytes', 'unknown')}")
+    print(f"local_bytes={status.get('localBytes', 'unknown')}")
+    print(f"global_bytes={status.get('globalBytes', 'unknown')}")
+    if scan_time := status.get("scanTime"):
+        print(f"scan_time={scan_time}")
+
+
+def _find_syncthing_api_key() -> str | None:
+    if env_key := os.getenv("WD_SYNCTHING_API_KEY"):
+        return env_key
+
+    candidates = [
+        Path.home() / ".local/state/syncthing/config.xml",
+        Path.home() / ".config/syncthing/config.xml",
+    ]
+
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+
+        try:
+            tree = ET.parse(candidate)
+            api_key = tree.findtext(".//apikey")
+        except ET.ParseError:
+            continue
+
+        if api_key:
+            return api_key.strip()
+
+    return None
+
+
+def _find_conflicts(root: Path) -> list[Path]:
+    if not root.exists():
+        return []
+
+    conflicts: list[Path] = []
+    for path in root.rglob("*"):
+        if path.is_file() and ".sync-conflict-" in path.name:
+            conflicts.append(path)
+
+    return sorted(conflicts)
+
+
+def cmd_open_latest(cfg: Config, _args: argparse.Namespace) -> int:
+    latest = _find_latest_markdown(cfg.root)
+    if latest is None:
+        latest = _create_new_draft(cfg.root, cfg.default_project, "draft")
+
+    return _run_editor(cfg.editor_command, [latest])
+
+
+def cmd_new(cfg: Config, args: argparse.Namespace) -> int:
+    draft = _create_new_draft(cfg.root, args.project, args.slug)
+    return _run_editor(cfg.editor_command, [draft])
+
+
+def cmd_projects(cfg: Config, _args: argparse.Namespace) -> int:
+    cfg.root.mkdir(parents=True, exist_ok=True)
+    projects = sorted(path.name for path in cfg.root.iterdir() if path.is_dir())
+    for project in projects:
+        print(project)
+    return 0
+
+
+def cmd_sync_status(cfg: Config, _args: argparse.Namespace) -> int:
+    client = SyncthingClient(cfg.folder_id)
+    status = client.status()
+    _print_status(status, cfg)
+    return 0
+
+
+def cmd_sync_now(cfg: Config, _args: argparse.Namespace) -> int:
+    client = SyncthingClient(cfg.folder_id)
+    client.scan()
+
+    deadline = time.time() + cfg.wait_timeout_sec
+    while time.time() < deadline:
+        status = client.status()
+        need_items = int(status.get("needItems", 0))
+        need_bytes = int(status.get("needBytes", 0))
+        state = str(status.get("state", "unknown"))
+
+        if need_items == 0 and need_bytes == 0 and state == "idle":
+            print("sync completed")
+            _print_status(status, cfg)
+            return 0
+
+        time.sleep(2)
+
+    raise WriterDeckError(
+        f"timed out waiting for sync completion after {cfg.wait_timeout_sec} seconds"
+    )
+
+
+def cmd_sync_doctor(cfg: Config, _args: argparse.Namespace) -> int:
+    conflicts = _find_conflicts(cfg.root)
+    if not conflicts:
+        print("no sync conflict files found")
+        return 0
+
+    print(f"found {len(conflicts)} conflict file(s):")
+    for conflict in conflicts:
+        try:
+            rel = conflict.relative_to(cfg.root)
+        except ValueError:
+            rel = conflict
+        print(rel)
+
+    return 1
+
+
+def _resolve_target_and_conflicts(root: Path, requested: Path) -> tuple[Path | None, list[Path]]:
+    if not requested.is_absolute():
+        requested = root / requested
+
+    requested = requested.resolve()
+
+    if ".sync-conflict-" in requested.name:
+        base_name = requested.name.split(".sync-conflict-")[0]
+        base_path = requested.with_name(base_name)
+        conflicts = sorted(requested.parent.glob(f"{base_name}.sync-conflict-*"))
+        return (base_path if base_path.exists() else None, conflicts)
+
+    base_path = requested
+    conflicts = sorted(base_path.parent.glob(f"{base_path.name}.sync-conflict-*"))
+    return (base_path if base_path.exists() else None, conflicts)
+
+
+def cmd_sync_resolve(cfg: Config, args: argparse.Namespace) -> int:
+    base_path, conflicts = _resolve_target_and_conflicts(cfg.root, Path(args.path))
+    if not conflicts:
+        raise WriterDeckError(f"no conflict copies found for: {args.path}")
+
+    files_to_open: list[Path] = []
+    if base_path:
+        files_to_open.append(base_path)
+    files_to_open.extend(conflicts)
+
+    print("opening files for manual merge:")
+    for path in files_to_open:
+        print(path)
+
+    return _run_editor(cfg.editor_command, files_to_open)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="WriterDeck CLI")
+    parser.add_argument(
+        "--config",
+        default=os.getenv("WD_CONFIG", str(DEFAULT_CONFIG_PATH)),
+        help="Path to writerdeck TOML config (default: /etc/writerdeck/config.toml)",
+    )
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    open_latest = subparsers.add_parser("open-latest", help="Open most recent draft")
+    open_latest.set_defaults(func=cmd_open_latest)
+
+    new_cmd = subparsers.add_parser("new", help="Create and open a new draft")
+    new_cmd.add_argument("project", help="Project folder name")
+    new_cmd.add_argument("slug", help="Draft slug")
+    new_cmd.set_defaults(func=cmd_new)
+
+    projects = subparsers.add_parser("projects", help="List project folders")
+    projects.set_defaults(func=cmd_projects)
+
+    sync = subparsers.add_parser("sync", help="Syncthing operations")
+    sync_sub = sync.add_subparsers(dest="sync_command", required=True)
+
+    sync_status = sync_sub.add_parser("status", help="Show current sync state")
+    sync_status.set_defaults(func=cmd_sync_status)
+
+    sync_now = sync_sub.add_parser("now", help="Trigger scan and wait for sync idle")
+    sync_now.set_defaults(func=cmd_sync_now)
+
+    sync_doctor = sync_sub.add_parser(
+        "doctor", help="Report Syncthing conflict artifacts in the writing tree"
+    )
+    sync_doctor.set_defaults(func=cmd_sync_doctor)
+
+    sync_resolve = sync_sub.add_parser(
+        "resolve", help="Open conflicted files side by side for manual merge"
+    )
+    sync_resolve.add_argument("path", help="Base file path or conflict file path")
+    sync_resolve.set_defaults(func=cmd_sync_resolve)
+
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+
+    try:
+        cfg = _load_config(Path(args.config).expanduser())
+        return args.func(cfg, args)
+    except WriterDeckError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
