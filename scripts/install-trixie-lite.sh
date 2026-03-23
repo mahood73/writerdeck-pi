@@ -138,8 +138,8 @@ setup_console() {
 
   # Update console-setup for terminal font (applies to all virtual terminals)
   if [ -f /etc/default/console-setup ]; then
-    sed -i "^FONTFACE=.*$|FONTFACE=Terminus" /etc/default/console-setup
-    sed -i "^FONTSIZE=.*$|FONTSIZE=$WD_CONSOLE_FONTSIZE" /etc/default/console-setup
+    sed -i "s|^FONTFACE=.*|FONTFACE=Terminus|" /etc/default/console-setup
+    sed -i "s|^FONTSIZE=.*|FONTSIZE=$WD_CONSOLE_FONTSIZE|" /etc/default/console-setup
     update-alternatives --set console-font /usr/share/consolefonts/"$WD_CONSOLE_FONTSIZE" 2>/dev/null || true
     setupcon 2>/dev/null || true
     log "Console font set to $WD_CONSOLE_FONTSIZE"
