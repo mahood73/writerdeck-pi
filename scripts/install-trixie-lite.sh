@@ -28,7 +28,7 @@ fi
 REPO_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 CONFIG_PATH=/etc/writerdeck/config.toml
 DEFAULT_CONFIG_PATH="$REPO_DIR/config/config.toml"
-CONSOLE_BLANK_SECONDS=600
+DEFAULT_CONSOLE_BLANK_SECONDS=600
 
 # Logging helper - prefix with sudo if needed
 log() {
@@ -136,6 +136,105 @@ probe_resolution() {
   echo ""
 }
 
+probe_console_fontsize() {
+  if [ -f /etc/default/console-setup ]; then
+    fontsize=$(sed -n 's/^FONTSIZE="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' /etc/default/console-setup | head -1)
+    if [ -n "$fontsize" ]; then
+      echo "$fontsize"
+      return
+    fi
+  fi
+  echo ""
+}
+
+probe_configured_resolution() {
+  cmdline_path=$1
+  config_path=$2
+
+  if [ -n "$cmdline_path" ] && [ -f "$cmdline_path" ]; then
+    for arg in $(cat "$cmdline_path"); do
+      case "$arg" in
+        video=HDMI-A-1:*)
+          video_spec=${arg#video=HDMI-A-1:}
+          video_spec=${video_spec%%,*}
+          video_spec=${video_spec%%@*}
+          video_spec=${video_spec%M}
+          hdmi_mode=$(get_hdmi_mode "$video_spec")
+          if [ -n "$hdmi_mode" ]; then
+            echo "$hdmi_mode"
+            return
+          fi
+          ;;
+      esac
+    done
+  fi
+
+  if [ -n "$config_path" ] && [ -f "$config_path" ]; then
+    hdmi_mode=$(sed -n 's/^hdmi_mode=\(.*\)$/\1/p' "$config_path" | head -1)
+    if [ -n "$hdmi_mode" ]; then
+      echo "$hdmi_mode"
+      return
+    fi
+  fi
+
+  echo ""
+}
+
+degrees_to_rotation() {
+  case "$1" in
+    90) echo "1" ;;
+    180) echo "2" ;;
+    270) echo "3" ;;
+    *) echo "0" ;;
+  esac
+}
+
+probe_configured_rotation() {
+  cmdline_path=$1
+  config_path=$2
+
+  if [ -n "$cmdline_path" ] && [ -f "$cmdline_path" ]; then
+    for arg in $(cat "$cmdline_path"); do
+      case "$arg" in
+        video=HDMI-A-1:*)
+          rotation=$(printf '%s\n' "$arg" | sed -n 's/.*rotate=\([0-9][0-9]*\).*/\1/p')
+          if [ -n "$rotation" ]; then
+            degrees_to_rotation "$rotation"
+            return
+          fi
+          ;;
+      esac
+    done
+  fi
+
+  if [ -n "$config_path" ] && [ -f "$config_path" ]; then
+    rotation=$(sed -n 's/^display_rotate=\(.*\)$/\1/p' "$config_path" | head -1)
+    if [ -n "$rotation" ]; then
+      echo "$rotation"
+      return
+    fi
+  fi
+
+  echo ""
+}
+
+probe_configured_consoleblank() {
+  cmdline_path=$1
+
+  if [ -n "$cmdline_path" ] && [ -f "$cmdline_path" ]; then
+    for arg in $(cat "$cmdline_path"); do
+      case "$arg" in
+        consoleblank=*)
+          echo "${arg#consoleblank=}"
+          return
+          ;;
+      esac
+    done
+  fi
+
+  echo ""
+}
+
 show_header() {
   echo ""
   echo "========================================"
@@ -177,23 +276,47 @@ prompt_target_user() {
 }
 
 prompt_console_settings() {
+  CONFIG_TXT=""
+  if [ -f /boot/firmware/config.txt ]; then
+    CONFIG_TXT=/boot/firmware/config.txt
+  elif [ -f /boot/config.txt ]; then
+    CONFIG_TXT=/boot/config.txt
+  fi
+
+  CMDLINE_TXT=""
+  if [ -f /boot/firmware/cmdline.txt ]; then
+    CMDLINE_TXT=/boot/firmware/cmdline.txt
+  elif [ -f /boot/cmdline.txt ]; then
+    CMDLINE_TXT=/boot/cmdline.txt
+  fi
+
   echo ""
   echo "Console display settings:"
-  echo "  Press Enter to accept the default [recommended]."
+  echo "  Press Enter to keep the current setting shown in brackets."
   echo ""
-  
-  detected=$(probe_resolution)
-  DETECTED_RESOLUTION=$detected
-  default_res=${detected:-82}
-  
-  printf "Console font size (ter-v32n, ter-v24n, VGA8x16) [ter-v32n]: "
+
+  existing_font=$(probe_console_fontsize)
+  default_font=${existing_font:-ter-v32n}
+
+  configured_res=$(probe_configured_resolution "$CMDLINE_TXT" "$CONFIG_TXT")
+  detected_res=$(probe_resolution)
+  DETECTED_RESOLUTION=${configured_res:-$detected_res}
+  default_res=${configured_res:-${detected_res:-82}}
+
+  configured_rotate=$(probe_configured_rotation "$CMDLINE_TXT" "$CONFIG_TXT")
+  default_rotate=${configured_rotate:-0}
+
+  configured_blank=$(probe_configured_consoleblank "$CMDLINE_TXT")
+  default_blank=${configured_blank:-$DEFAULT_CONSOLE_BLANK_SECONDS}
+
+  printf "Console font size (ter-v32n, ter-v24n, VGA8x16) [%s]: " "$default_font"
   read -r font_input
   if [ -z "$font_input" ]; then
-    CONSOLE_FONTSIZE="ter-v32n"
+    CONSOLE_FONTSIZE=$default_font
   else
     CONSOLE_FONTSIZE=$font_input
   fi
-  
+
   echo ""
   echo "HDMI resolution (current: ${default_res:-unknown}):"
   echo "  51 = 1024x600 (WriterDeck panel)"
@@ -212,23 +335,36 @@ prompt_console_settings() {
   echo "Physical screen orientation:"
   echo "  Choose how the display is mounted right now."
   echo "  The installer will rotate the console to match."
-  echo "  0 = mounted normally [recommended]"
+  echo "  0 = mounted normally"
   echo "  1 = display is turned 90 degrees clockwise"
   echo "  2 = display is upside down"
   echo "  3 = display is turned 90 degrees anti-clockwise"
-  printf "Choice [0]: "
+  printf "Choice [%s]: " "$default_rotate"
   read -r rot_input
   if [ -z "$rot_input" ]; then
-    CONSOLE_ROTATE="0"
+    CONSOLE_ROTATE=$default_rotate
   else
     CONSOLE_ROTATE=$rot_input
   fi
-  
+
+  echo ""
+  echo "Console blanking timeout in seconds:"
+  echo "  600 = blank after 10 minutes [recommended]"
+  echo "  0   = disable blanking"
+  printf "Choice [%s]: " "$default_blank"
+  read -r blank_input
+  if [ -z "$blank_input" ]; then
+    CONSOLE_BLANK_SECONDS=$default_blank
+  else
+    CONSOLE_BLANK_SECONDS=$blank_input
+  fi
+
   echo ""
   echo "Console configuration:"
   echo "  Font:      $CONSOLE_FONTSIZE"
   echo "  Resolution: $CONSOLE_RESOLUTION"
   echo "  Screen orientation: $CONSOLE_ROTATE"
+  echo "  Screen blanking: $CONSOLE_BLANK_SECONDS seconds"
   echo ""
   printf "Proceed with these settings? [Y/n]: "
   read -r confirm
@@ -504,7 +640,11 @@ setup_console() {
     fi
 
     if configure_cmdline_consoleblank "$CMDLINE_TXT" "$CONSOLE_BLANK_SECONDS"; then
-      log "Enabled console blanking after $((CONSOLE_BLANK_SECONDS / 60)) minutes in $CMDLINE_TXT"
+      if [ "$CONSOLE_BLANK_SECONDS" = "0" ]; then
+        log "Disabled console blanking in $CMDLINE_TXT"
+      else
+        log "Set console blanking to $CONSOLE_BLANK_SECONDS seconds in $CMDLINE_TXT"
+      fi
     fi
   fi
 }

@@ -12,9 +12,9 @@ Run:
 sudo ./scripts/install-trixie-lite.sh
 ```
 
-The installer now prompts for console resolution and rotation. On current Trixie images it applies forced HDMI mode and rotation through `/boot/firmware/cmdline.txt` with a `video=HDMI-A-1:...` kernel argument instead of relying on legacy `display_rotate`.
+The installer now prompts for console resolution, rotation, and blanking timeout. On reruns it prefers the current configured values it finds in `/boot/firmware/cmdline.txt` and related console config files, then falls back to live detection where possible.
 
-It also enables the kernel's built-in console blanking with `consoleblank=600`, so the text console blanks after 10 minutes of inactivity to reduce burn-in risk.
+On current Trixie images it applies forced HDMI mode and rotation through `/boot/firmware/cmdline.txt` with a `video=HDMI-A-1:...` kernel argument instead of relying on legacy `display_rotate`. It also configures the kernel's built-in console blanking with `consoleblank=<seconds>`; the installer default is `600` seconds (10 minutes).
 
 This installs:
 
@@ -23,7 +23,7 @@ This installs:
 - `tailscale`
 - `ufw`
 - WriterDeck scripts/config
-- 10-minute console screen blanking on the text console
+- Configurable text-console screen blanking (default `600` seconds)
 
 Idempotency notes:
 
@@ -171,7 +171,7 @@ Adjust LAN CIDRs before enabling if your network differs.
 ## 6. Verification checklist
 
 - Reboot device; `tty1` opens into `micro` via `wd open-latest`.
-- Leave the device idle on `tty1`; the display blanks after 10 minutes and wakes on keypress.
+- Leave the device idle on `tty1`; the display blanks after the configured timeout and wakes on keypress.
 - Quit `micro`; menu appears with `w/s/r/p` options.
 - Choose `s`; shell opens. Type `exit`; menu appears again.
 - `wd new notes first` creates `projects/notes/<timestamp>_first.md`.
