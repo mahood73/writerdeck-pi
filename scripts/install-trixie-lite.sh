@@ -28,6 +28,7 @@ fi
 REPO_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 CONFIG_PATH=/etc/writerdeck/config.toml
 DEFAULT_CONFIG_PATH="$REPO_DIR/config/config.toml"
+CONSOLE_BLANK_SECONDS=600
 
 # Logging helper - prefix with sudo if needed
 log() {
@@ -295,6 +296,34 @@ configure_cmdline_video() {
   return 0
 }
 
+configure_cmdline_consoleblank() {
+  cmdline_path=$1
+  blank_seconds=$2
+  current_cmdline=$(cat "$cmdline_path")
+  updated_cmdline=""
+
+  for arg in $current_cmdline; do
+    case "$arg" in
+      consoleblank=*) ;;
+      *) updated_cmdline="${updated_cmdline}${updated_cmdline:+ }$arg" ;;
+    esac
+  done
+
+  if [ -n "$blank_seconds" ]; then
+    updated_cmdline="${updated_cmdline}${updated_cmdline:+ }consoleblank=${blank_seconds}"
+  fi
+
+  if [ "$updated_cmdline" = "$current_cmdline" ]; then
+    return 1
+  fi
+
+  rendered_cmdline=$(mktemp)
+  printf '%s\n' "$updated_cmdline" > "$rendered_cmdline"
+  sudo_if_needed install -m 0644 "$rendered_cmdline" "$cmdline_path"
+  rm -f "$rendered_cmdline"
+  return 0
+}
+
 # -----------------------------------------------------------------------------
 # Main flow
 # -----------------------------------------------------------------------------
@@ -472,6 +501,10 @@ setup_console() {
       else
         log "Removed kernel video override from $CMDLINE_TXT"
       fi
+    fi
+
+    if configure_cmdline_consoleblank "$CMDLINE_TXT" "$CONSOLE_BLANK_SECONDS"; then
+      log "Enabled console blanking after $((CONSOLE_BLANK_SECONDS / 60)) minutes in $CMDLINE_TXT"
     fi
   fi
 }
