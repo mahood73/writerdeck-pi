@@ -235,6 +235,50 @@ probe_configured_consoleblank() {
   echo ""
 }
 
+is_supported_resolution() {
+  case "$1" in
+    0|1|9|16|35|51|82|86) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+is_supported_rotation() {
+  case "$1" in
+    0|1|2|3) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+is_non_negative_integer() {
+  case "$1" in
+    ''|*[!0-9]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+validate_console_font() {
+  font_name=$1
+
+  if [ -z "$font_name" ]; then
+    return 1
+  fi
+
+  if [ -f "/usr/share/consolefonts/${font_name}" ] \
+    || [ -f "/usr/share/consolefonts/${font_name}.psf.gz" ] \
+    || [ -f "/usr/share/consolefonts/${font_name}.psfu.gz" ]; then
+    return 0
+  fi
+
+  if [ -f /etc/default/console-setup ]; then
+    current_font=$(sed -n 's/^FONTSIZE="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' /etc/default/console-setup | head -1)
+    if [ "$font_name" = "$current_font" ]; then
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
 show_header() {
   echo ""
   echo "========================================"
@@ -309,13 +353,21 @@ prompt_console_settings() {
   configured_blank=$(probe_configured_consoleblank "$CMDLINE_TXT")
   default_blank=${configured_blank:-$DEFAULT_CONSOLE_BLANK_SECONDS}
 
-  printf "Console font size (ter-v32n, ter-v24n, VGA8x16) [%s]: " "$default_font"
-  read -r font_input
-  if [ -z "$font_input" ]; then
-    CONSOLE_FONTSIZE=$default_font
-  else
-    CONSOLE_FONTSIZE=$font_input
-  fi
+  while :; do
+    printf "Console font size (ter-v32n, ter-v24n, VGA8x16) [%s]: " "$default_font"
+    read -r font_input
+    if [ -z "$font_input" ]; then
+      CONSOLE_FONTSIZE=$default_font
+    else
+      CONSOLE_FONTSIZE=$font_input
+    fi
+
+    if validate_console_font "$CONSOLE_FONTSIZE"; then
+      break
+    fi
+
+    echo "Please choose an installed console font name, such as ter-v32n, ter-v24n, or VGA8x16."
+  done
 
   echo ""
   echo "HDMI resolution (current: ${default_res:-unknown}):"
@@ -323,13 +375,21 @@ prompt_console_settings() {
   echo "  82 = 1280x720 (720p)"
   echo "  86 = 1920x1080 (1080p)"
   echo "  0  = skip (use current)"
-  printf "Choice [%s]: " "$default_res"
-  read -r res_input
-  if [ -z "$res_input" ]; then
-    CONSOLE_RESOLUTION="$default_res"
-  else
-    CONSOLE_RESOLUTION=$res_input
-  fi
+  while :; do
+    printf "Choice [%s]: " "$default_res"
+    read -r res_input
+    if [ -z "$res_input" ]; then
+      CONSOLE_RESOLUTION="$default_res"
+    else
+      CONSOLE_RESOLUTION=$res_input
+    fi
+
+    if is_supported_resolution "$CONSOLE_RESOLUTION"; then
+      break
+    fi
+
+    echo "Please choose one of: 0, 51, 82, or 86."
+  done
   
   echo ""
   echo "Physical screen orientation:"
@@ -339,25 +399,41 @@ prompt_console_settings() {
   echo "  1 = display is turned 90 degrees clockwise"
   echo "  2 = display is upside down"
   echo "  3 = display is turned 90 degrees anti-clockwise"
-  printf "Choice [%s]: " "$default_rotate"
-  read -r rot_input
-  if [ -z "$rot_input" ]; then
-    CONSOLE_ROTATE=$default_rotate
-  else
-    CONSOLE_ROTATE=$rot_input
-  fi
+  while :; do
+    printf "Choice [%s]: " "$default_rotate"
+    read -r rot_input
+    if [ -z "$rot_input" ]; then
+      CONSOLE_ROTATE=$default_rotate
+    else
+      CONSOLE_ROTATE=$rot_input
+    fi
+
+    if is_supported_rotation "$CONSOLE_ROTATE"; then
+      break
+    fi
+
+    echo "Please choose one of: 0, 1, 2, or 3."
+  done
 
   echo ""
   echo "Console blanking timeout in seconds:"
   echo "  600 = blank after 10 minutes [recommended]"
   echo "  0   = disable blanking"
-  printf "Choice [%s]: " "$default_blank"
-  read -r blank_input
-  if [ -z "$blank_input" ]; then
-    CONSOLE_BLANK_SECONDS=$default_blank
-  else
-    CONSOLE_BLANK_SECONDS=$blank_input
-  fi
+  while :; do
+    printf "Choice [%s]: " "$default_blank"
+    read -r blank_input
+    if [ -z "$blank_input" ]; then
+      CONSOLE_BLANK_SECONDS=$default_blank
+    else
+      CONSOLE_BLANK_SECONDS=$blank_input
+    fi
+
+    if is_non_negative_integer "$CONSOLE_BLANK_SECONDS"; then
+      break
+    fi
+
+    echo "Please enter a whole number of seconds, or 0 to disable blanking."
+  done
 
   echo ""
   echo "Console configuration:"
