@@ -9,6 +9,7 @@ Implementation of the WriterDeck v2 plan for Raspberry Pi Zero 2W on Debian 13.3
 - `config/config.toml`: default config contract.
 - `deploy/`: autologin, profile, firewall, and home sync-node templates.
 - `scripts/install-trixie-lite.sh`: MVP install workflow for the deck.
+- `scripts/uninstall-trixie-lite.sh`: removes WriterDeck tty1 integration and restores backed-up system files.
 - `scripts/enable-phase2-two-way.sh`: phase transition helper.
 - `tests/test_wd.py`: CLI behavior tests.
 
@@ -48,6 +49,8 @@ wait_timeout_sec = 180
 3. Configure Tailscale and Syncthing folder pairing.
 4. Reboot and verify `tty1` opens directly into `micro`.
 5. Quit `micro` and verify the WriterDeck menu appears (`w/s/r/p`).
+
+To remove the tty1 WriterDeck login/session behavior later, run `sudo ./scripts/uninstall-trixie-lite.sh`.
 
 ## Session behavior
 

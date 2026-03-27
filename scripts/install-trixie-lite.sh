@@ -29,6 +29,7 @@ REPO_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 CONFIG_PATH=/etc/writerdeck/config.toml
 DEFAULT_CONFIG_PATH="$REPO_DIR/config/config.toml"
 DEFAULT_CONSOLE_BLANK_SECONDS=600
+STATE_DIR=/etc/writerdeck/uninstall
 
 # Logging helper - prefix with sudo if needed
 log() {
@@ -42,6 +43,19 @@ sudo_if_needed() {
   else
     "$@"
   fi
+}
+
+backup_file_if_missing() {
+  source_path=$1
+  backup_relative_path=$2
+  backup_path="$STATE_DIR/$backup_relative_path"
+
+  if [ ! -f "$source_path" ] || [ -f "$backup_path" ]; then
+    return
+  fi
+
+  sudo_if_needed install -d -m 0755 "$(dirname "$backup_path")"
+  sudo_if_needed cp -a "$source_path" "$backup_path"
 }
 
 # -----------------------------------------------------------------------------
@@ -639,6 +653,7 @@ setup_console() {
   log "Configuring console: font=$CONSOLE_FONTSIZE, resolution=$CONSOLE_RESOLUTION, rotation=$CONSOLE_ROTATE"
   
   if [ -f /etc/default/console-setup ]; then
+    backup_file_if_missing /etc/default/console-setup etc/default/console-setup
     sudo_if_needed sed -i "s|^FONTFACE=.*|FONTFACE=Terminus|" /etc/default/console-setup
     sudo_if_needed sed -i "s|^FONTSIZE=.*|FONTSIZE=$CONSOLE_FONTSIZE|" /etc/default/console-setup
     sudo_if_needed update-alternatives --set console-font /usr/share/consolefonts/"$CONSOLE_FONTSIZE" 2>/dev/null || true
@@ -661,6 +676,7 @@ setup_console() {
   fi
   
   if [ -n "$CONFIG_TXT" ]; then
+    backup_file_if_missing "$CONFIG_TXT" "${CONFIG_TXT#/}"
     remove_config_key "$CONFIG_TXT" "display_rotate"
 
     if [ -z "$CMDLINE_TXT" ]; then
@@ -687,6 +703,7 @@ setup_console() {
   fi
 
   if [ -n "$CMDLINE_TXT" ]; then
+    backup_file_if_missing "$CMDLINE_TXT" "${CMDLINE_TXT#/}"
     video_resolution=""
     if [ "$CONSOLE_RESOLUTION" != "0" ]; then
       video_resolution=$(hdmi_mode_to_resolution "$CONSOLE_RESOLUTION")
@@ -729,14 +746,19 @@ setup_console() {
 install_required_packages
 
 sudo_if_needed install -d -m 0755 /etc/writerdeck
+sudo_if_needed install -d -m 0755 "$STATE_DIR"
+backup_file_if_missing "$CONFIG_PATH" etc/writerdeck/config.toml
 install_config
 setup_console
 
 sudo_if_needed install -d -m 0755 /usr/local/bin
+backup_file_if_missing /usr/local/bin/wd usr/local/bin/wd
+backup_file_if_missing /usr/local/bin/wd-session usr/local/bin/wd-session
 sudo_if_needed install -m 0755 "$REPO_DIR/bin/wd" /usr/local/bin/wd
 sudo_if_needed install -m 0755 "$REPO_DIR/bin/wd-session" /usr/local/bin/wd-session
 
 sudo_if_needed install -d -m 0755 /etc/systemd/system/getty@tty1.service.d
+backup_file_if_missing /etc/systemd/system/getty@tty1.service.d/override.conf etc/systemd/system/getty@tty1.service.d/override.conf
 sudo_if_needed tee /etc/systemd/system/getty@tty1.service.d/override.conf >/dev/null <<EOF
 [Service]
 ExecStart=
@@ -744,6 +766,7 @@ ExecStart=-/sbin/agetty --autologin $TARGET_USER --noclear %I \$TERM
 Type=idle
 EOF
 
+backup_file_if_missing /etc/profile.d/wd-session.sh etc/profile.d/wd-session.sh
 sudo_if_needed install -m 0644 "$REPO_DIR/deploy/profile-wd-session.sh" /etc/profile.d/wd-session.sh
 
 # Enable services

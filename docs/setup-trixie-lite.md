@@ -41,6 +41,8 @@ The installer configures:
 - `/etc/systemd/system/getty@tty1.service.d/override.conf` (autologin for selected install user on `tty1`)
 - `/etc/profile.d/wd-session.sh` (launches WriterDeck session only on `tty1`)
 
+The installer also keeps one-time backups of the system files it changes under `/etc/writerdeck/uninstall/`, so the uninstaller can restore the original console and login behavior later.
+
 Apply and reboot:
 
 ```bash
@@ -60,6 +62,23 @@ sudo systemctl restart getty@tty1
   - `p` poweroff (with confirmation)
 - Exiting the shell returns to this menu.
 - `tty2+` logins are normal shells and do not launch writer session.
+
+### Undo WriterDeck tty1 integration
+
+Run:
+
+```bash
+sudo ./scripts/uninstall-trixie-lite.sh
+```
+
+The uninstaller:
+
+- removes the tty1 autologin + `wd-session` hook
+- restores backed-up console/login files when available
+- otherwise removes the WriterDeck-managed `video=HDMI-A-1:...` and `consoleblank=...` kernel args
+- stops and disables `syncthing@<user>.service`
+- removes WriterDeck binaries and config
+- keeps packages and writing data by default
 
 ## 3. Configure Syncthing (Phase 1)
 
