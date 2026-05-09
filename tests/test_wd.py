@@ -17,9 +17,30 @@ class WriterDeckCliTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name) / "projects"
         self.config_path = Path(self.tmp.name) / "config.toml"
-        self._write_config()
+        self.editor_log_path = Path(self.tmp.name) / "editor.log"
+        self.fake_editor = self._create_fake_editor("editor")
+        self._write_config(str(self.fake_editor))
 
-    def _write_config(self, editor_command="touch"):
+    def _create_fake_editor(self, name):
+        fake_bin = Path(self.tmp.name) / "bin"
+        fake_bin.mkdir(exist_ok=True)
+        fake_editor = fake_bin / name
+        fake_editor.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/bin/sh
+                printf '%s|%s\\n' "$(pwd)" "$*" >> "{self.editor_log_path}"
+                if [ "$#" -gt 0 ]; then
+                  : > "$1"
+                fi
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_editor.chmod(fake_editor.stat().st_mode | stat.S_IXUSR)
+        return fake_editor
+
+    def _write_config(self, editor_command):
         content = textwrap.dedent(
             f"""
             [paths]
@@ -63,15 +84,12 @@ class WriterDeckCliTests(unittest.TestCase):
         self.assertTrue(drafts[0].name.endswith("_first-draft.wg"))
 
     def test_new_opens_blank_wordgrinder_without_creating_invalid_draft(self):
-        fake_bin = Path(self.tmp.name) / "bin"
-        fake_bin.mkdir()
-        fake_wordgrinder = fake_bin / "wordgrinder"
-        log_path = Path(self.tmp.name) / "wordgrinder.log"
+        fake_wordgrinder = Path(self.tmp.name) / "bin" / "wordgrinder"
         fake_wordgrinder.write_text(
             textwrap.dedent(
                 f"""\
                 #!/bin/sh
-                echo "$@" >> "{log_path}"
+                printf '%s|%s\\n' "$(pwd)" "$*" >> "{self.editor_log_path}"
                 """
             ),
             encoding="utf-8",
@@ -85,8 +103,8 @@ class WriterDeckCliTests(unittest.TestCase):
         drafts = list((self.root / "notes").glob("*.wg"))
         self.assertEqual(drafts, [])
         self.assertTrue((self.root / "notes").is_dir())
-        calls = log_path.read_text(encoding="utf-8").splitlines()
-        self.assertEqual(calls, [""])
+        calls = self.editor_log_path.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(calls, [f"{(self.root / 'notes').resolve()}|"])
         self.assertIn("Save it under:", result.stdout)
 
     def test_projects_lists_directories(self):

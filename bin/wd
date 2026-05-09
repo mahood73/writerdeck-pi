@@ -157,13 +157,15 @@ def _create_new_draft(root: Path, project: str, slug: str | None = None) -> Path
     return draft_path
 
 
-def _run_editor(editor_command: str, files: list[Path] | None = None) -> int:
+def _run_editor(
+    editor_command: str, files: list[Path] | None = None, cwd: Path | None = None
+) -> int:
     cmd = shlex.split(editor_command)
     if not cmd:
         raise WriterDeckError("editor.command is empty")
 
     cmd.extend(str(path) for path in files or [])
-    return subprocess.run(cmd, check=False).returncode
+    return subprocess.run(cmd, cwd=cwd, check=False).returncode
 
 
 def _is_wordgrinder_command(editor_command: str) -> bool:
@@ -242,7 +244,7 @@ def cmd_new(cfg: Config, args: argparse.Namespace) -> int:
             "Opening a blank WordGrinder document. "
             f"Save it under: {project_dir}"
         )
-        return _run_editor(cfg.editor_command)
+        return _run_editor(cfg.editor_command, cwd=project_dir)
 
     draft = _create_new_draft(cfg.root, args.project, args.slug)
     return _run_editor(cfg.editor_command, [draft])
