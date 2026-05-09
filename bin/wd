@@ -157,12 +157,12 @@ def _create_new_draft(root: Path, project: str, slug: str | None = None) -> Path
     return draft_path
 
 
-def _run_editor(editor_command: str, files: list[Path]) -> int:
+def _run_editor(editor_command: str, files: list[Path] | None = None) -> int:
     cmd = shlex.split(editor_command)
     if not cmd:
         raise WriterDeckError("editor.command is empty")
 
-    cmd.extend(str(path) for path in files)
+    cmd.extend(str(path) for path in files or [])
     return subprocess.run(cmd, check=False).returncode
 
 
@@ -171,26 +171,6 @@ def _is_wordgrinder_command(editor_command: str) -> bool:
     if not cmd:
         return False
     return Path(cmd[0]).name in {"wordgrinder", "xwordgrinder"}
-
-
-def _initialise_wordgrinder_document(editor_command: str, path: Path) -> None:
-    if path.exists():
-        return
-
-    path.write_text(
-        "\n".join(
-            [
-                f'.name: "{path}"',
-                ".statusbar: true",
-                ".current: 1",
-                "#1",
-                "P ",
-                ".",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
 
 
 def _print_status(status: dict, cfg: Config) -> None:
@@ -245,17 +225,26 @@ def _find_conflicts(root: Path) -> list[Path]:
 def cmd_open_latest(cfg: Config, _args: argparse.Namespace) -> int:
     latest = _find_latest_draft(cfg.root)
     if latest is None:
-        latest = _create_new_draft(cfg.root, cfg.default_project, "draft")
         if _is_wordgrinder_command(cfg.editor_command):
-            _initialise_wordgrinder_document(cfg.editor_command, latest)
+            cfg.root.mkdir(parents=True, exist_ok=True)
+            return _run_editor(cfg.editor_command)
+        latest = _create_new_draft(cfg.root, cfg.default_project, "draft")
 
     return _run_editor(cfg.editor_command, [latest])
 
 
 def cmd_new(cfg: Config, args: argparse.Namespace) -> int:
-    draft = _create_new_draft(cfg.root, args.project, args.slug)
     if _is_wordgrinder_command(cfg.editor_command):
-        _initialise_wordgrinder_document(cfg.editor_command, draft)
+        project_name = _sanitize_name(args.project, "project")
+        project_dir = cfg.root / project_name
+        project_dir.mkdir(parents=True, exist_ok=True)
+        print(
+            "Opening a blank WordGrinder document. "
+            f"Save it under: {project_dir}"
+        )
+        return _run_editor(cfg.editor_command)
+
+    draft = _create_new_draft(cfg.root, args.project, args.slug)
     return _run_editor(cfg.editor_command, [draft])
 
 

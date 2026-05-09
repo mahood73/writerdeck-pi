@@ -62,7 +62,7 @@ class WriterDeckCliTests(unittest.TestCase):
         self.assertEqual(len(drafts), 1)
         self.assertTrue(drafts[0].name.endswith("_first-draft.wg"))
 
-    def test_new_initialises_single_document_wordgrinder_draft_before_opening(self):
+    def test_new_opens_blank_wordgrinder_without_creating_invalid_draft(self):
         fake_bin = Path(self.tmp.name) / "bin"
         fake_bin.mkdir()
         fake_wordgrinder = fake_bin / "wordgrinder"
@@ -83,23 +83,11 @@ class WriterDeckCliTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
         drafts = list((self.root / "notes").glob("*.wg"))
-        self.assertEqual(len(drafts), 1)
-        self.assertEqual(
-            drafts[0].read_text(encoding="utf-8"),
-            "\n".join(
-                [
-                    f'.name: "{drafts[0]}"',
-                    ".statusbar: true",
-                    ".current: 1",
-                    "#1",
-                    "P ",
-                    ".",
-                    "",
-                ]
-            ),
-        )
+        self.assertEqual(drafts, [])
+        self.assertTrue((self.root / "notes").is_dir())
         calls = log_path.read_text(encoding="utf-8").splitlines()
-        self.assertEqual(calls, [str(drafts[0])])
+        self.assertEqual(calls, [""])
+        self.assertIn("Save it under:", result.stdout)
 
     def test_projects_lists_directories(self):
         (self.root / "alpha").mkdir(parents=True)
