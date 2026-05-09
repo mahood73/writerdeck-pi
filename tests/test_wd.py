@@ -107,6 +107,28 @@ class WriterDeckCliTests(unittest.TestCase):
         self.assertEqual(calls, [f"{(self.root / 'notes').resolve()}|"])
         self.assertIn("Save it under:", result.stdout)
 
+    def test_new_without_folder_uses_default_project_for_wordgrinder(self):
+        fake_wordgrinder = Path(self.tmp.name) / "bin" / "wordgrinder"
+        fake_wordgrinder.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/bin/sh
+                printf '%s|%s\\n' "$(pwd)" "$*" >> "{self.editor_log_path}"
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_wordgrinder.chmod(fake_wordgrinder.stat().st_mode | stat.S_IXUSR)
+        self._write_config(str(fake_wordgrinder))
+
+        result = self._run("new")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        self.assertTrue((self.root / "inbox").is_dir())
+        calls = self.editor_log_path.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(calls, [f"{(self.root / 'inbox').resolve()}|"])
+        self.assertIn("Save it under:", result.stdout)
+
     def test_projects_lists_directories(self):
         (self.root / "alpha").mkdir(parents=True)
         (self.root / "beta").mkdir(parents=True)
