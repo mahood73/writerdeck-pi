@@ -154,8 +154,6 @@ def _create_new_draft(root: Path, project: str, slug: str | None = None) -> Path
         draft_path = project_dir / f"{timestamp}_{slug_name}-{counter}.wg"
         counter += 1
 
-    draft_path.touch()
-
     return draft_path
 
 

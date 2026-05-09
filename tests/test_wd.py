@@ -26,7 +26,7 @@ class WriterDeckCliTests(unittest.TestCase):
             default_project = \"inbox\"
 
             [editor]
-            command = \"true\"
+            command = \"touch\"
 
             [sync]
             folder_id = \"writing\"
