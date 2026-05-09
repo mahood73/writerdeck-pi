@@ -12,7 +12,6 @@ import shlex
 import subprocess
 import sys
 import time
-import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -178,27 +177,20 @@ def _initialise_wordgrinder_document(editor_command: str, path: Path) -> None:
     if path.exists():
         return
 
-    cmd = shlex.split(editor_command)
-    if not cmd:
-        raise WriterDeckError("editor.command is empty")
-
-    with tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", suffix=".txt", delete=False
-    ) as seed:
-        seed_path = Path(seed.name)
-        seed.write("\n")
-
-    try:
-        convert_cmd = [cmd[0], "--convert", str(seed_path), str(path)]
-        result = subprocess.run(convert_cmd, text=True, capture_output=True, check=False)
-    finally:
-        seed_path.unlink(missing_ok=True)
-
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout).strip()
-        if detail:
-            raise WriterDeckError(f"failed to initialise WordGrinder document: {detail}")
-        raise WriterDeckError("failed to initialise WordGrinder document")
+    path.write_text(
+        "\n".join(
+            [
+                f'.name: "{path}"',
+                ".statusbar: true",
+                ".current: 1",
+                "#1",
+                "P ",
+                ".",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
 
 
 def _print_status(status: dict, cfg: Config) -> None:

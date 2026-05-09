@@ -62,7 +62,7 @@ class WriterDeckCliTests(unittest.TestCase):
         self.assertEqual(len(drafts), 1)
         self.assertTrue(drafts[0].name.endswith("_first-draft.wg"))
 
-    def test_new_initialises_wordgrinder_draft_before_opening(self):
+    def test_new_initialises_single_document_wordgrinder_draft_before_opening(self):
         fake_bin = Path(self.tmp.name) / "bin"
         fake_bin.mkdir()
         fake_wordgrinder = fake_bin / "wordgrinder"
@@ -72,9 +72,6 @@ class WriterDeckCliTests(unittest.TestCase):
                 f"""\
                 #!/bin/sh
                 echo "$@" >> "{log_path}"
-                if [ "$1" = "--convert" ]; then
-                  cp "$2" "$3"
-                fi
                 """
             ),
             encoding="utf-8",
@@ -87,11 +84,22 @@ class WriterDeckCliTests(unittest.TestCase):
 
         drafts = list((self.root / "notes").glob("*.wg"))
         self.assertEqual(len(drafts), 1)
+        self.assertEqual(
+            drafts[0].read_text(encoding="utf-8"),
+            "\n".join(
+                [
+                    f'.name: "{drafts[0]}"',
+                    ".statusbar: true",
+                    ".current: 1",
+                    "#1",
+                    "P ",
+                    ".",
+                    "",
+                ]
+            ),
+        )
         calls = log_path.read_text(encoding="utf-8").splitlines()
-        self.assertEqual(len(calls), 2)
-        self.assertIn(f"--convert", calls[0])
-        self.assertTrue(calls[0].endswith(str(drafts[0])))
-        self.assertEqual(calls[1], str(drafts[0]))
+        self.assertEqual(calls, [str(drafts[0])])
 
     def test_projects_lists_directories(self):
         (self.root / "alpha").mkdir(parents=True)
