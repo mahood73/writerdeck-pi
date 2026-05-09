@@ -77,11 +77,11 @@ class WriterDeckCliTests(unittest.TestCase):
         self.assertEqual(len(drafts), 1)
 
     def test_new_creates_project_draft(self):
-        result = self._run("new", "notes", "first-draft")
+        result = self._run("new", "notes")
         self.assertEqual(result.returncode, 0, result.stderr)
         drafts = list((self.root / "notes").glob("*.wg"))
         self.assertEqual(len(drafts), 1)
-        self.assertTrue(drafts[0].name.endswith("_first-draft.wg"))
+        self.assertTrue(drafts[0].name.endswith("_draft.wg"))
 
     def test_new_opens_blank_wordgrinder_without_creating_invalid_draft(self):
         fake_wordgrinder = Path(self.tmp.name) / "bin" / "wordgrinder"
@@ -97,7 +97,7 @@ class WriterDeckCliTests(unittest.TestCase):
         fake_wordgrinder.chmod(fake_wordgrinder.stat().st_mode | stat.S_IXUSR)
         self._write_config(str(fake_wordgrinder))
 
-        result = self._run("new", "notes", "first-draft")
+        result = self._run("new", "notes")
         self.assertEqual(result.returncode, 0, result.stderr)
 
         drafts = list((self.root / "notes").glob("*.wg"))

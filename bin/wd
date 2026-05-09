@@ -237,7 +237,7 @@ def cmd_open_latest(cfg: Config, _args: argparse.Namespace) -> int:
 
 def cmd_new(cfg: Config, args: argparse.Namespace) -> int:
     if _is_wordgrinder_command(cfg.editor_command):
-        project_name = _sanitize_name(args.project, "project")
+        project_name = _sanitize_name(args.folder, "folder")
         project_dir = cfg.root / project_name
         project_dir.mkdir(parents=True, exist_ok=True)
         print(
@@ -246,7 +246,7 @@ def cmd_new(cfg: Config, args: argparse.Namespace) -> int:
         )
         return _run_editor(cfg.editor_command, cwd=project_dir)
 
-    draft = _create_new_draft(cfg.root, args.project, args.slug)
+    draft = _create_new_draft(cfg.root, args.folder)
     return _run_editor(cfg.editor_command, [draft])
 
 
@@ -352,9 +352,8 @@ def build_parser() -> argparse.ArgumentParser:
     open_latest = subparsers.add_parser("open-latest", help="Open most recent draft")
     open_latest.set_defaults(func=cmd_open_latest)
 
-    new_cmd = subparsers.add_parser("new", help="Create and open a new draft")
-    new_cmd.add_argument("project", help="Project folder name")
-    new_cmd.add_argument("slug", help="Draft slug")
+    new_cmd = subparsers.add_parser("new", help="Open a new draft in a folder")
+    new_cmd.add_argument("folder", help="Folder name")
     new_cmd.set_defaults(func=cmd_new)
 
     projects = subparsers.add_parser("projects", help="List project folders")

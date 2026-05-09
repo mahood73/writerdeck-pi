@@ -323,7 +323,7 @@ Adjust LAN CIDRs before enabling if your network differs.
 - Leave the device idle on `tty1`; the display blanks after the configured timeout and wakes on keypress.
 - Quit WordGrinder; menu appears with `w/s/r/p` options.
 - Choose `s`; shell opens. Type `exit`; menu appears again.
-- `wd new notes first` creates `notes/<timestamp>_first.wg`.
+- `wd new notes` opens a blank WordGrinder document with the save dialog rooted in `~/Writing/notes`.
 - `systemctl status syncthing@$(whoami).service` is `active (running)`.
 - `wd sync status` returns folder status.
 - `wd sync now` completes without timeout.

@@ -16,7 +16,7 @@ Implementation of the WriterDeck v2 plan for Raspberry Pi Zero 2W on Debian 13.3
 ## CLI commands
 
 - `wd open-latest`
-- `wd new <project> <slug>`
+- `wd new <foldername>`
 - `wd projects`
 - `wd sync status`
 - `wd sync now`
