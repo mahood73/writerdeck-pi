@@ -5,14 +5,15 @@ small and should change as the real writing workflow becomes clearer.
 
 ## Current direction
 
-Use `~/Sync/WriterDeck` as the top-level synced directory.
+Use `~/Writing` as the top-level synced directory.
 
 Rationale:
 
-- `~/Sync` already exists as the shared base on desktop and laptop.
-- Syncthing can selectively sync only `WriterDeck` to the Pi.
+- `~/Writing` is a dedicated writing sync root across the Pi, NAS, desktop,
+  and laptop.
+- It avoids nested Syncthing folders and selective-sync ignore rules.
 - Files remain easy to inspect and recover from any synced machine.
-- The deck does not need to know about the rest of the user's sync tree.
+- The deck does not need to know about unrelated personal sync data.
 
 ## Editor model
 
@@ -49,13 +50,13 @@ Plain text should still be exported because it is the long-term recovery format.
 Initial top-level:
 
 ```text
-~/Sync/WriterDeck/
+~/Writing/
 ```
 
 Possible future structure:
 
 ```text
-~/Sync/WriterDeck/
+~/Writing/
   longform/
     Novel Name/
       Novel Name.wg
@@ -133,7 +134,7 @@ desktop/Scrivener tooling tidy it.
 
 ## Sync and safety
 
-Syncthing should sync `~/Sync/WriterDeck`.
+Syncthing should sync `~/Writing`.
 
 Tailscale should provide reliable connectivity while away from the home LAN.
 

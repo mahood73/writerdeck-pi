@@ -51,6 +51,11 @@ detect_default_target_user() {
   fi
 
   if [ -f "$CONFIG_PATH" ]; then
+    detected_user=$(sed -n 's|^root = "/home/\([^/]*\)/Writing"$|\1|p' "$CONFIG_PATH" | head -1)
+    if [ -n "$detected_user" ]; then
+      echo "$detected_user"
+      return
+    fi
     detected_user=$(sed -n 's|^root = "/home/\([^/]*\)/Sync/WriterDeck"$|\1|p' "$CONFIG_PATH" | head -1)
     if [ -n "$detected_user" ]; then
       echo "$detected_user"
@@ -107,7 +112,15 @@ prompt_target_user() {
 prompt_data_removal() {
   REMOVE_WRITING_DATA=false
 
-  if [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/Sync/WriterDeck" ]; then
+  if [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/Writing" ]; then
+    echo ""
+    printf "Remove writing data at %s/Writing too? [y/N]: " "$TARGET_HOME"
+    read -r remove_data_input
+    case "$remove_data_input" in
+      y|Y|yes|Yes) REMOVE_WRITING_DATA=true ;;
+      *) ;;
+    esac
+  elif [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/Sync/WriterDeck" ]; then
     echo ""
     printf "Remove writing data at %s/Sync/WriterDeck too? [y/N]: " "$TARGET_HOME"
     read -r remove_data_input
@@ -325,7 +338,10 @@ cleanup_state_dir
 remove_dir_if_empty /etc/systemd/system/getty@tty1.service.d
 remove_dir_if_empty /etc/writerdeck
 
-if [ "$REMOVE_WRITING_DATA" = "true" ] && [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/Sync/WriterDeck" ]; then
+if [ "$REMOVE_WRITING_DATA" = "true" ] && [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/Writing" ]; then
+  sudo_if_needed rm -rf "$TARGET_HOME/Writing"
+  log "Removed $TARGET_HOME/Writing"
+elif [ "$REMOVE_WRITING_DATA" = "true" ] && [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/Sync/WriterDeck" ]; then
   sudo_if_needed rm -rf "$TARGET_HOME/Sync/WriterDeck"
   log "Removed $TARGET_HOME/Sync/WriterDeck"
 elif [ "$REMOVE_WRITING_DATA" = "true" ] && [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/writing" ]; then

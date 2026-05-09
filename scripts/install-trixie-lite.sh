@@ -581,7 +581,8 @@ prompt_console_settings
 # -----------------------------------------------------------------------------
 
 # Create writing directory structure in user's sync tree
-WRITING_ROOT="$TARGET_HOME/Sync/WriterDeck"
+WRITING_ROOT="$TARGET_HOME/Writing"
+sudo_if_needed install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$WRITING_ROOT"
 sudo_if_needed install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$WRITING_ROOT/inbox"
 log "Created writing directory at $WRITING_ROOT"
 
@@ -613,8 +614,20 @@ install_required_packages() {
 
 render_default_config() {
   destination=$1
-  sed "s|^root = \"/home/writer/Sync/WriterDeck\"$|root = \"$WRITING_ROOT\"|" \
+  sed "s|^root = \"/home/writer/Writing\"$|root = \"$WRITING_ROOT\"|" \
     "$DEFAULT_CONFIG_PATH" > "$destination"
+}
+
+is_managed_sync_writerdeck_config() {
+  config_path=$1
+
+  [ -f "$config_path" ] || return 1
+  grep -q "^root = \"$TARGET_HOME/Sync/WriterDeck\"$" "$config_path" || return 1
+  grep -q '^default_project = "inbox"$' "$config_path" || return 1
+  grep -q '^command = "wordgrinder"$' "$config_path" || return 1
+  grep -q '^folder_id = "writing"$' "$config_path" || return 1
+  grep -q '^mode = "single_writer"$' "$config_path" || return 1
+  return 0
 }
 
 is_managed_legacy_config() {
@@ -640,7 +653,9 @@ install_config() {
     return
   fi
   
-  if cmp -s "$DEFAULT_CONFIG_PATH" "$CONFIG_PATH" || is_managed_legacy_config "$CONFIG_PATH"; then
+  if cmp -s "$DEFAULT_CONFIG_PATH" "$CONFIG_PATH" \
+    || is_managed_sync_writerdeck_config "$CONFIG_PATH" \
+    || is_managed_legacy_config "$CONFIG_PATH"; then
     sudo_if_needed install -m 0644 "$CONFIG_PATH" "${CONFIG_PATH}.bak"
     sudo_if_needed install -m 0644 "$rendered_default" "$CONFIG_PATH"
     rm -f "$rendered_default"

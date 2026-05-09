@@ -246,7 +246,7 @@ ssh -L <free-local-port>:127.0.0.1:8384 <pi-user>@<writerdeck-ip-or-hostname>
 
 On WriterDeck:
 
-- Create folder id `writing` at `/home/<pi-user>/Sync/WriterDeck`
+- Create folder id `writing` at `/home/<pi-user>/Writing`
 - Set folder type: `Send Only`
 - Pair with home sync node device id
 
@@ -255,7 +255,7 @@ In the Syncthing web UI:
 - `Add Folder`
   - Folder Label: `writing`
   - Folder ID: `writing` (must match `/etc/writerdeck/config.toml`)
-  - Folder Path: `/home/<pi-user>/Sync/WriterDeck`
+  - Folder Path: `/home/<pi-user>/Writing`
   - Folder Type: `Send Only`
 - `Add Remote Device`
   - Paste home node device ID

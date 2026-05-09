@@ -29,7 +29,7 @@ Default path: `/etc/writerdeck/config.toml`
 
 ```toml
 [paths]
-root = "/home/<pi-user>/Sync/WriterDeck"
+root = "/home/<pi-user>/Writing"
 default_project = "inbox"
 
 [editor]
