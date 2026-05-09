@@ -51,6 +51,11 @@ detect_default_target_user() {
   fi
 
   if [ -f "$CONFIG_PATH" ]; then
+    detected_user=$(sed -n 's|^root = "/home/\([^/]*\)/Sync/WriterDeck"$|\1|p' "$CONFIG_PATH" | head -1)
+    if [ -n "$detected_user" ]; then
+      echo "$detected_user"
+      return
+    fi
     detected_user=$(sed -n 's|^root = "/home/\([^/]*\)/writing/projects"$|\1|p' "$CONFIG_PATH" | head -1)
     if [ -n "$detected_user" ]; then
       echo "$detected_user"
@@ -102,7 +107,15 @@ prompt_target_user() {
 prompt_data_removal() {
   REMOVE_WRITING_DATA=false
 
-  if [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/writing" ]; then
+  if [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/Sync/WriterDeck" ]; then
+    echo ""
+    printf "Remove writing data at %s/Sync/WriterDeck too? [y/N]: " "$TARGET_HOME"
+    read -r remove_data_input
+    case "$remove_data_input" in
+      y|Y|yes|Yes) REMOVE_WRITING_DATA=true ;;
+      *) ;;
+    esac
+  elif [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/writing" ]; then
     echo ""
     printf "Remove writing data at %s/writing too? [y/N]: " "$TARGET_HOME"
     read -r remove_data_input
@@ -312,7 +325,10 @@ cleanup_state_dir
 remove_dir_if_empty /etc/systemd/system/getty@tty1.service.d
 remove_dir_if_empty /etc/writerdeck
 
-if [ "$REMOVE_WRITING_DATA" = "true" ] && [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/writing" ]; then
+if [ "$REMOVE_WRITING_DATA" = "true" ] && [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/Sync/WriterDeck" ]; then
+  sudo_if_needed rm -rf "$TARGET_HOME/Sync/WriterDeck"
+  log "Removed $TARGET_HOME/Sync/WriterDeck"
+elif [ "$REMOVE_WRITING_DATA" = "true" ] && [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/writing" ]; then
   sudo_if_needed rm -rf "$TARGET_HOME/writing"
   log "Removed $TARGET_HOME/writing"
 fi
@@ -326,5 +342,5 @@ echo "  Uninstall Complete!"
 echo "========================================"
 echo ""
 echo "WriterDeck tty1 autologin/session hooks have been removed."
-echo "Packages such as micro, syncthing, tailscale, and ufw were left installed."
+echo "Packages such as wordgrinder-ncurses, syncthing, and tailscale were left installed."
 echo "Reboot if you want the restored console boot settings applied immediately."

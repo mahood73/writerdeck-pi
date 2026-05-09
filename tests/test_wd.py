@@ -51,15 +51,15 @@ class WriterDeckCliTests(unittest.TestCase):
     def test_open_latest_creates_initial_inbox_file(self):
         result = self._run("open-latest")
         self.assertEqual(result.returncode, 0, result.stderr)
-        drafts = list((self.root / "inbox").glob("*.md"))
+        drafts = list((self.root / "inbox").glob("*.wg"))
         self.assertEqual(len(drafts), 1)
 
     def test_new_creates_project_draft(self):
         result = self._run("new", "notes", "first-draft")
         self.assertEqual(result.returncode, 0, result.stderr)
-        drafts = list((self.root / "notes").glob("*.md"))
+        drafts = list((self.root / "notes").glob("*.wg"))
         self.assertEqual(len(drafts), 1)
-        self.assertTrue(drafts[0].name.endswith("_first-draft.md"))
+        self.assertTrue(drafts[0].name.endswith("_first-draft.wg"))
 
     def test_projects_lists_directories(self):
         (self.root / "alpha").mkdir(parents=True)

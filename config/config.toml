@@ -1,10 +1,10 @@
 [paths]
 # Installer rewrites this template path to the selected target user's home.
-root = "/home/writer/writing/projects"
+root = "/home/writer/Sync/WriterDeck"
 default_project = "inbox"
 
 [editor]
-command = "micro"
+command = "wordgrinder"
 
 [sync]
 folder_id = "writing"

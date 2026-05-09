@@ -580,17 +580,17 @@ prompt_console_settings
 # Unprivileged operations (as current user)
 # -----------------------------------------------------------------------------
 
-# Create writing directory structure in user's home
-mkdir -p "$TARGET_HOME/writing/projects/inbox"
-chown -R "$TARGET_USER:$TARGET_GROUP" "$TARGET_HOME/writing"
-log "Created writing directory at $TARGET_HOME/writing"
+# Create writing directory structure in user's sync tree
+WRITING_ROOT="$TARGET_HOME/Sync/WriterDeck"
+sudo_if_needed install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$WRITING_ROOT/inbox"
+log "Created writing directory at $WRITING_ROOT"
 
 # -----------------------------------------------------------------------------
 # Privileged operations (via sudo)
 # -----------------------------------------------------------------------------
 
 install_required_packages() {
-  required_packages="micro syncthing tailscale ufw python3"
+  required_packages="wordgrinder-ncurses syncthing tailscale python3"
   missing_packages=""
   
   for pkg in $required_packages; do
@@ -613,8 +613,20 @@ install_required_packages() {
 
 render_default_config() {
   destination=$1
-  sed "s|^root = \"/home/writer/writing/projects\"$|root = \"$TARGET_HOME/writing/projects\"|" \
+  sed "s|^root = \"/home/writer/Sync/WriterDeck\"$|root = \"$WRITING_ROOT\"|" \
     "$DEFAULT_CONFIG_PATH" > "$destination"
+}
+
+is_managed_legacy_config() {
+  config_path=$1
+
+  [ -f "$config_path" ] || return 1
+  grep -q "^root = \"$TARGET_HOME/writing/projects\"$" "$config_path" || return 1
+  grep -q '^default_project = "inbox"$' "$config_path" || return 1
+  grep -q '^command = "micro"$' "$config_path" || return 1
+  grep -q '^folder_id = "writing"$' "$config_path" || return 1
+  grep -q '^mode = "single_writer"$' "$config_path" || return 1
+  return 0
 }
 
 install_config() {
@@ -628,7 +640,7 @@ install_config() {
     return
   fi
   
-  if cmp -s "$DEFAULT_CONFIG_PATH" "$CONFIG_PATH"; then
+  if cmp -s "$DEFAULT_CONFIG_PATH" "$CONFIG_PATH" || is_managed_legacy_config "$CONFIG_PATH"; then
     sudo_if_needed install -m 0644 "$CONFIG_PATH" "${CONFIG_PATH}.bak"
     sudo_if_needed install -m 0644 "$rendered_default" "$CONFIG_PATH"
     rm -f "$rendered_default"

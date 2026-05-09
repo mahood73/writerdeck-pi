@@ -18,12 +18,138 @@ On current Trixie images it applies forced HDMI mode and rotation through `/boot
 
 This installs:
 
-- `micro`
+- `wordgrinder-ncurses`
 - `syncthing`
 - `tailscale`
-- `ufw`
 - WriterDeck scripts/config
 - Configurable text-console screen blanking (default `600` seconds)
+
+### Editor: WordGrinder
+
+The default WriterDeck editor is WordGrinder. It is a better fit for the
+hardware when the desired feel is closer to a console word processor than a
+programmer's editor.
+
+The low-friction option is the Trixie package, which the installer installs:
+
+```bash
+sudo apt install wordgrinder-ncurses
+```
+
+This currently installs WordGrinder 0.8. That is enough for testing the
+workflow and keeps the device tidy. The WriterDeck editor command in
+`/etc/writerdeck/config.toml` should be:
+
+```toml
+[editor]
+command = "wordgrinder"
+```
+
+WordGrinder 0.9 exists upstream, but is not currently packaged in Trixie. The
+upstream build can be installed into `~/.local` while leaving the apt package
+available as a fallback. Use this only if the 0.9 fixes/features are worth
+building from source.
+
+Install build dependencies:
+
+```bash
+sudo apt install git build-essential make ninja-build pkg-config python3 libncursesw5-dev zlib1g-dev
+```
+
+Clone the source:
+
+```bash
+mkdir -p ~/src ~/.local/bin ~/.local/man/man1
+cd ~/src
+git clone https://github.com/davidgiven/wordgrinder.git
+cd wordgrinder
+```
+
+As of the tested 0.9 upstream source, the ncurses-only build may still try to
+materialise Windows/Haiku OpenGL targets. That causes errors such as:
+
+```text
+AssertionError: Required package 'opengl' not installed
+```
+
+Rather than installing the large OpenGL development stack on a console-only
+deck, patch the build target declarations:
+
+```bash
+python3 <<'PY'
+from pathlib import Path
+
+p = Path("src/c/build.py")
+s = p.read_text()
+p.with_suffix(".py.bak").write_text(s)
+
+s = s.replace(
+    "    HAS_XWORDGRINDER,\n"
+    "    DEFAULT_DICTIONARY_PATH,\n"
+    ")\n",
+    "    HAS_XWORDGRINDER,\n"
+    "    DEFAULT_DICTIONARY_PATH,\n"
+    "    IS_WINDOWS,\n"
+    "    HAS_HAIKU,\n"
+    ")\n",
+)
+
+def wrap_block(text, start, end_marker, guard):
+    i = text.index(start)
+    j = text.index(end_marker, i)
+    block = text[i:j]
+    indented = "".join("    " + line if line.strip() else line for line in block.splitlines(True))
+    return text[:i] + guard + ":\n" + indented + text[j:]
+
+s = wrap_block(
+    s,
+    'make_wordgrinder(\n    "wordgrinder-wincon",',
+    "\nif HAS_XWORDGRINDER:",
+    "if IS_WINDOWS",
+)
+
+s = wrap_block(
+    s,
+    'make_wordgrinder(\n    "wordgrinder-glfw-windows",',
+    '\nmake_wordgrinder(\n    "wordgrinder-glfw-haiku",',
+    "if IS_WINDOWS",
+)
+
+s = wrap_block(
+    s,
+    'make_wordgrinder(\n    "wordgrinder-glfw-haiku",',
+    "\n",
+    "if HAS_HAIKU",
+)
+
+p.write_text(s)
+PY
+```
+
+Build and install the ncurses binary:
+
+```bash
+BUILDTYPE=unix-ncurses-only make
+PREFIX="$HOME/.local" BUILDTYPE=unix-ncurses-only make install
+```
+
+Check which version will run:
+
+```bash
+which wordgrinder
+~/.local/bin/wordgrinder --help
+```
+
+If `which wordgrinder` still shows `/usr/bin/wordgrinder`, either call
+`~/.local/bin/wordgrinder` explicitly from the WriterDeck config or put this
+near the end of `~/.profile`:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Test all editor changes with throwaway documents first. Do not put real writing
+into the deck until export, backup, and sync behavior are verified.
 
 Idempotency notes:
 
@@ -54,8 +180,8 @@ sudo systemctl restart getty@tty1
 
 `wd-session` now runs as a session supervisor:
 
-- Boot/login on `tty1` opens `micro` (`wd open-latest`).
-- Exiting `micro` shows a menu:
+- Boot/login on `tty1` opens WordGrinder (`wd open-latest`).
+- Exiting WordGrinder shows a menu:
   - `w` reopen editor
   - `s` open shell
   - `r` reboot (with confirmation)
@@ -120,7 +246,7 @@ ssh -L <free-local-port>:127.0.0.1:8384 <pi-user>@<writerdeck-ip-or-hostname>
 
 On WriterDeck:
 
-- Create folder id `writing` at `/home/<pi-user>/writing/projects`
+- Create folder id `writing` at `/home/<pi-user>/Sync/WriterDeck`
 - Set folder type: `Send Only`
 - Pair with home sync node device id
 
@@ -129,7 +255,7 @@ In the Syncthing web UI:
 - `Add Folder`
   - Folder Label: `writing`
   - Folder ID: `writing` (must match `/etc/writerdeck/config.toml`)
-  - Folder Path: `/home/<pi-user>/writing/projects`
+  - Folder Path: `/home/<pi-user>/Sync/WriterDeck`
   - Folder Type: `Send Only`
 - `Add Remote Device`
   - Paste home node device ID
@@ -181,7 +307,11 @@ Use tailnet addresses for off-LAN connectivity.
 
 ## 5. Optional firewall baseline
 
+The installer does not install or enable `ufw` by default. If you want the
+repo's optional firewall baseline, install `ufw` and run:
+
 ```bash
+sudo apt install ufw
 sudo ./deploy/ufw-writerdeck.sh
 ```
 
@@ -189,11 +319,11 @@ Adjust LAN CIDRs before enabling if your network differs.
 
 ## 6. Verification checklist
 
-- Reboot device; `tty1` opens into `micro` via `wd open-latest`.
+- Reboot device; `tty1` opens into WordGrinder via `wd open-latest`.
 - Leave the device idle on `tty1`; the display blanks after the configured timeout and wakes on keypress.
-- Quit `micro`; menu appears with `w/s/r/p` options.
+- Quit WordGrinder; menu appears with `w/s/r/p` options.
 - Choose `s`; shell opens. Type `exit`; menu appears again.
-- `wd new notes first` creates `projects/notes/<timestamp>_first.md`.
+- `wd new notes first` creates `notes/<timestamp>_first.wg`.
 - `systemctl status syncthing@$(whoami).service` is `active (running)`.
 - `wd sync status` returns folder status.
 - `wd sync now` completes without timeout.

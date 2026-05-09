@@ -29,11 +29,11 @@ Default path: `/etc/writerdeck/config.toml`
 
 ```toml
 [paths]
-root = "/home/<pi-user>/writing/projects"
+root = "/home/<pi-user>/Sync/WriterDeck"
 default_project = "inbox"
 
 [editor]
-command = "micro"
+command = "wordgrinder"
 
 [sync]
 folder_id = "writing"
@@ -47,8 +47,8 @@ wait_timeout_sec = 180
 2. Run `sudo ./scripts/install-trixie-lite.sh` on the Pi.
    The installer targets the invoking sudo user by default (`$SUDO_USER`).
 3. Configure Tailscale and Syncthing folder pairing.
-4. Reboot and verify `tty1` opens directly into `micro`.
-5. Quit `micro` and verify the WriterDeck menu appears (`w/s/r/p`).
+4. Reboot and verify `tty1` opens directly into WordGrinder.
+5. Quit WordGrinder and verify the WriterDeck menu appears (`w/s/r/p`).
 
 To remove the tty1 WriterDeck login/session behavior later, run `sudo ./scripts/uninstall-trixie-lite.sh`.
 

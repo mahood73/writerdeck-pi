@@ -128,11 +128,11 @@ def _timestamp_now() -> str:
     return dt.datetime.now().strftime("%Y-%m-%d_%H%M")
 
 
-def _find_latest_markdown(root: Path) -> Path | None:
+def _find_latest_draft(root: Path) -> Path | None:
     if not root.exists():
         return None
 
-    files = [path for path in root.rglob("*.md") if path.is_file()]
+    files = [path for path in root.rglob("*.wg") if path.is_file()]
     if not files:
         return None
 
@@ -148,10 +148,10 @@ def _create_new_draft(root: Path, project: str, slug: str | None = None) -> Path
     project_dir.mkdir(parents=True, exist_ok=True)
 
     timestamp = _timestamp_now()
-    draft_path = project_dir / f"{timestamp}_{slug_name}.md"
+    draft_path = project_dir / f"{timestamp}_{slug_name}.wg"
     counter = 2
     while draft_path.exists():
-        draft_path = project_dir / f"{timestamp}_{slug_name}-{counter}.md"
+        draft_path = project_dir / f"{timestamp}_{slug_name}-{counter}.wg"
         counter += 1
 
     draft_path.touch()
@@ -218,7 +218,7 @@ def _find_conflicts(root: Path) -> list[Path]:
 
 
 def cmd_open_latest(cfg: Config, _args: argparse.Namespace) -> int:
-    latest = _find_latest_markdown(cfg.root)
+    latest = _find_latest_draft(cfg.root)
     if latest is None:
         latest = _create_new_draft(cfg.root, cfg.default_project, "draft")
 

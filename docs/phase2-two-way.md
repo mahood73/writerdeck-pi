@@ -33,7 +33,7 @@ wd sync doctor
 - Open conflicting files for manual merge:
 
 ```bash
-wd sync resolve projects/<project>/<file>.md
+wd sync resolve <project>/<file>.wg
 ```
 
 or pass the conflict file path directly.
