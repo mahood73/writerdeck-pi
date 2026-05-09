@@ -12,6 +12,7 @@ import shlex
 import subprocess
 import sys
 import time
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -166,6 +167,40 @@ def _run_editor(editor_command: str, files: list[Path]) -> int:
     return subprocess.run(cmd, check=False).returncode
 
 
+def _is_wordgrinder_command(editor_command: str) -> bool:
+    cmd = shlex.split(editor_command)
+    if not cmd:
+        return False
+    return Path(cmd[0]).name in {"wordgrinder", "xwordgrinder"}
+
+
+def _initialise_wordgrinder_document(editor_command: str, path: Path) -> None:
+    if path.exists():
+        return
+
+    cmd = shlex.split(editor_command)
+    if not cmd:
+        raise WriterDeckError("editor.command is empty")
+
+    with tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", suffix=".txt", delete=False
+    ) as seed:
+        seed_path = Path(seed.name)
+        seed.write("\n")
+
+    try:
+        convert_cmd = [cmd[0], "--convert", str(seed_path), str(path)]
+        result = subprocess.run(convert_cmd, text=True, capture_output=True, check=False)
+    finally:
+        seed_path.unlink(missing_ok=True)
+
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        if detail:
+            raise WriterDeckError(f"failed to initialise WordGrinder document: {detail}")
+        raise WriterDeckError("failed to initialise WordGrinder document")
+
+
 def _print_status(status: dict, cfg: Config) -> None:
     print(f"folder_id={cfg.folder_id}")
     print(f"mode={cfg.sync_mode}")
@@ -219,12 +254,16 @@ def cmd_open_latest(cfg: Config, _args: argparse.Namespace) -> int:
     latest = _find_latest_draft(cfg.root)
     if latest is None:
         latest = _create_new_draft(cfg.root, cfg.default_project, "draft")
+        if _is_wordgrinder_command(cfg.editor_command):
+            _initialise_wordgrinder_document(cfg.editor_command, latest)
 
     return _run_editor(cfg.editor_command, [latest])
 
 
 def cmd_new(cfg: Config, args: argparse.Namespace) -> int:
     draft = _create_new_draft(cfg.root, args.project, args.slug)
+    if _is_wordgrinder_command(cfg.editor_command):
+        _initialise_wordgrinder_document(cfg.editor_command, draft)
     return _run_editor(cfg.editor_command, [draft])
 
 

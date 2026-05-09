@@ -1,4 +1,5 @@
 import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -18,7 +19,7 @@ class WriterDeckCliTests(unittest.TestCase):
         self.config_path = Path(self.tmp.name) / "config.toml"
         self._write_config()
 
-    def _write_config(self):
+    def _write_config(self, editor_command="touch"):
         content = textwrap.dedent(
             f"""
             [paths]
@@ -26,7 +27,7 @@ class WriterDeckCliTests(unittest.TestCase):
             default_project = \"inbox\"
 
             [editor]
-            command = \"touch\"
+            command = \"{editor_command}\"
 
             [sync]
             folder_id = \"writing\"
@@ -60,6 +61,37 @@ class WriterDeckCliTests(unittest.TestCase):
         drafts = list((self.root / "notes").glob("*.wg"))
         self.assertEqual(len(drafts), 1)
         self.assertTrue(drafts[0].name.endswith("_first-draft.wg"))
+
+    def test_new_initialises_wordgrinder_draft_before_opening(self):
+        fake_bin = Path(self.tmp.name) / "bin"
+        fake_bin.mkdir()
+        fake_wordgrinder = fake_bin / "wordgrinder"
+        log_path = Path(self.tmp.name) / "wordgrinder.log"
+        fake_wordgrinder.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/bin/sh
+                echo "$@" >> "{log_path}"
+                if [ "$1" = "--convert" ]; then
+                  cp "$2" "$3"
+                fi
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_wordgrinder.chmod(fake_wordgrinder.stat().st_mode | stat.S_IXUSR)
+        self._write_config(str(fake_wordgrinder))
+
+        result = self._run("new", "notes", "first-draft")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        drafts = list((self.root / "notes").glob("*.wg"))
+        self.assertEqual(len(drafts), 1)
+        calls = log_path.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(len(calls), 2)
+        self.assertIn(f"--convert", calls[0])
+        self.assertTrue(calls[0].endswith(str(drafts[0])))
+        self.assertEqual(calls[1], str(drafts[0]))
 
     def test_projects_lists_directories(self):
         (self.root / "alpha").mkdir(parents=True)
