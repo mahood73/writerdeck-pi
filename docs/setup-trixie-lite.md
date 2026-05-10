@@ -194,6 +194,9 @@ sudo systemctl restart getty@tty1
 - The session uses `XKB_DEFAULT_LAYOUT=gb` so UK keyboard symbols are mapped
   correctly.
 - If `cage` or `foot` is unavailable, the session falls back to raw tty.
+- WordGrinder handles some Alt/function-key combinations itself. If `Alt+F2`
+  does not switch to `tty2` while WordGrinder is open, quit to the WriterDeck
+  menu first, then switch tty.
 - Exiting WordGrinder shows a menu:
   - `w` reopen editor
   - `s` open shell
