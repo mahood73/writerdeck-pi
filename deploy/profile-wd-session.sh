@@ -5,7 +5,7 @@ if [ "${WD_NO_AUTOSESSION:-0}" != "1" ] \
   if [ "${WD_IN_TERMINAL:-0}" != "1" ] \
     && command -v cage >/dev/null 2>&1 \
     && command -v foot >/dev/null 2>&1; then
-    echo "WriterDeck starting up..."
+    echo -e "\n\nWriterDeck starting up..."
     WD_IN_TERMINAL=1 XKB_DEFAULT_LAYOUT=${WD_XKB_LAYOUT:-gb} \
       cage -- foot --fullscreen /usr/local/bin/wd-session && exit 0
 
