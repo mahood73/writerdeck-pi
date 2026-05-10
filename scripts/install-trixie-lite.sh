@@ -591,7 +591,7 @@ log "Created writing directory at $WRITING_ROOT"
 # -----------------------------------------------------------------------------
 
 install_required_packages() {
-  required_packages="wordgrinder-ncurses syncthing tailscale python3"
+  required_packages="wordgrinder-ncurses cage foot syncthing tailscale python3"
   missing_packages=""
   
   for pkg in $required_packages; do

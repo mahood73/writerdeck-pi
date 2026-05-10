@@ -19,6 +19,8 @@ On current Trixie images it applies forced HDMI mode and rotation through `/boot
 This installs:
 
 - `wordgrinder-ncurses`
+- `cage`
+- `foot`
 - `syncthing`
 - `tailscale`
 - WriterDeck scripts/config
@@ -180,7 +182,12 @@ sudo systemctl restart getty@tty1
 
 `wd-session` now runs as a session supervisor:
 
-- Boot/login on `tty1` opens WordGrinder (`wd open-latest`).
+- Boot/login on `tty1` opens WordGrinder inside a full-screen `cage` + `foot`
+  Wayland terminal.
+- The session uses `XKB_DEFAULT_LAYOUT=gb` so UK keyboard symbols are mapped
+  correctly.
+- If `cage` or `foot` fails, the session falls back to raw tty WordGrinder and
+  writes the Wayland terminal log to `/tmp/wd-cage-foot.log`.
 - Exiting WordGrinder shows a menu:
   - `w` reopen editor
   - `s` open shell
@@ -319,7 +326,7 @@ Adjust LAN CIDRs before enabling if your network differs.
 
 ## 6. Verification checklist
 
-- Reboot device; `tty1` opens into WordGrinder via `wd open-latest`.
+- Reboot device; `tty1` opens into WordGrinder inside `cage` + `foot`.
 - Leave the device idle on `tty1`; the display blanks after the configured timeout and wakes on keypress.
 - Quit WordGrinder; menu appears with `w/s/r/p` options.
 - Choose `s`; shell opens. Type `exit`; menu appears again.
