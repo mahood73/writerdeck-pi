@@ -1,3 +1,5 @@
+[![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/mahood73/writerdeck-pi?utm_source=oss&utm_medium=github&utm_campaign=mahood73%2Fwriterdeck-pi&labelColor=171717&color=FF570A&label=CodeRabbit+Reviews)](https://coderabbit.ai)
+
 # WriterDeck Toolkit
 
 Implementation of the WriterDeck v2 plan for Raspberry Pi Zero 2W on Debian 13.3 (Trixie) Lite.
