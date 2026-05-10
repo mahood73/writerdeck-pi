@@ -55,7 +55,7 @@ To remove the tty1 WriterDeck login/session behavior later, run `sudo ./scripts/
 ## Session behavior
 
 - `tty1` autologin launches `wd-session`.
-- `wd-session` opens WordGrinder in `cage` + `foot` when available, with raw tty fallback.
+- `wd-session` runs inside `cage` + `foot` when available, with raw tty fallback.
 - Exiting the editor opens a session menu instead of immediate relogin loop.
 - Menu actions:
   - `w` reopen editor

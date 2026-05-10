@@ -151,17 +151,6 @@ probe_resolution() {
   echo ""
 }
 
-probe_console_fontsize() {
-  if [ -f /etc/default/console-setup ]; then
-    fontsize=$(sed -n 's/^FONTSIZE="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' /etc/default/console-setup | head -1)
-    if [ -n "$fontsize" ]; then
-      echo "$fontsize"
-      return
-    fi
-  fi
-  echo ""
-}
-
 probe_configured_resolution() {
   cmdline_path=$1
   config_path=$2
@@ -271,29 +260,6 @@ is_non_negative_integer() {
   esac
 }
 
-validate_console_font() {
-  font_name=$1
-
-  if [ -z "$font_name" ]; then
-    return 1
-  fi
-
-  if [ -f "/usr/share/consolefonts/${font_name}" ] \
-    || [ -f "/usr/share/consolefonts/${font_name}.psf.gz" ] \
-    || [ -f "/usr/share/consolefonts/${font_name}.psfu.gz" ]; then
-    return 0
-  fi
-
-  if [ -f /etc/default/console-setup ]; then
-    current_font=$(sed -n 's/^FONTSIZE="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' /etc/default/console-setup | head -1)
-    if [ "$font_name" = "$current_font" ]; then
-      return 0
-    fi
-  fi
-
-  return 1
-}
-
 show_header() {
   echo ""
   echo "========================================"
@@ -350,12 +316,9 @@ prompt_console_settings() {
   fi
 
   echo ""
-  echo "Console display settings:"
+  echo "Display settings:"
   echo "  Press Enter to keep the current setting shown in brackets."
   echo ""
-
-  existing_font=$(probe_console_fontsize)
-  default_font=${existing_font:-ter-v32n}
 
   configured_res=$(probe_configured_resolution "$CMDLINE_TXT" "$CONFIG_TXT")
   detected_res=$(probe_resolution)
@@ -368,23 +331,6 @@ prompt_console_settings() {
   configured_blank=$(probe_configured_consoleblank "$CMDLINE_TXT")
   default_blank=${configured_blank:-$DEFAULT_CONSOLE_BLANK_SECONDS}
 
-  while :; do
-    printf "Console font size (ter-v32n, ter-v24n, VGA8x16) [%s]: " "$default_font"
-    read -r font_input
-    if [ -z "$font_input" ]; then
-      CONSOLE_FONTSIZE=$default_font
-    else
-      CONSOLE_FONTSIZE=$font_input
-    fi
-
-    if validate_console_font "$CONSOLE_FONTSIZE"; then
-      break
-    fi
-
-    echo "Please choose an installed console font name, such as ter-v32n, ter-v24n, or VGA8x16."
-  done
-
-  echo ""
   echo "HDMI resolution (current: ${default_res:-unknown}):"
   echo "  51 = 1024x600 (WriterDeck panel)"
   echo "  82 = 1280x720 (720p)"
@@ -452,7 +398,6 @@ prompt_console_settings() {
 
   echo ""
   echo "Console configuration:"
-  echo "  Font:      $CONSOLE_FONTSIZE"
   echo "  Resolution: $CONSOLE_RESOLUTION"
   echo "  Screen orientation: $CONSOLE_ROTATE"
   echo "  Screen blanking: $CONSOLE_BLANK_SECONDS seconds"
@@ -701,16 +646,7 @@ install_user_foot_config() {
 }
 
 setup_console() {
-  log "Configuring console: font=$CONSOLE_FONTSIZE, resolution=$CONSOLE_RESOLUTION, rotation=$CONSOLE_ROTATE"
-  
-  if [ -f /etc/default/console-setup ]; then
-    backup_file_if_missing /etc/default/console-setup etc/default/console-setup
-    sudo_if_needed sed -i "s|^FONTFACE=.*|FONTFACE=Terminus|" /etc/default/console-setup
-    sudo_if_needed sed -i "s|^FONTSIZE=.*|FONTSIZE=$CONSOLE_FONTSIZE|" /etc/default/console-setup
-    sudo_if_needed update-alternatives --set console-font /usr/share/consolefonts/"$CONSOLE_FONTSIZE" 2>/dev/null || true
-    sudo_if_needed setupcon 2>/dev/null || true
-    log "Console font set to $CONSOLE_FONTSIZE"
-  fi
+  log "Configuring console: resolution=$CONSOLE_RESOLUTION, rotation=$CONSOLE_ROTATE"
   
   CONFIG_TXT=""
   if [ -f /boot/firmware/config.txt ]; then

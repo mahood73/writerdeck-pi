@@ -185,13 +185,15 @@ sudo systemctl restart getty@tty1
 
 `wd-session` now runs as a session supervisor:
 
-- Boot/login on `tty1` opens WordGrinder inside a full-screen `cage` + `foot`
-  Wayland terminal. `foot` is launched with `--fullscreen` so the terminal
-  surface fills the whole 1024x600 display instead of resizing to a cell grid.
+- Boot/login on `tty1` starts a full-screen `cage` + `foot` Wayland terminal,
+  then runs `wd-session` inside it. `foot` is launched with `--fullscreen` so
+  the terminal surface fills the whole 1024x600 display instead of resizing to
+  a cell grid.
+- The `wd-session` menu, shell, and WordGrinder all run inside the same
+  terminal session.
 - The session uses `XKB_DEFAULT_LAYOUT=gb` so UK keyboard symbols are mapped
   correctly.
-- If `cage` or `foot` fails, the session falls back to raw tty WordGrinder and
-  writes the Wayland terminal log to `/tmp/wd-cage-foot.log`.
+- If `cage` or `foot` is unavailable, the session falls back to raw tty.
 - Exiting WordGrinder shows a menu:
   - `w` reopen editor
   - `s` open shell
