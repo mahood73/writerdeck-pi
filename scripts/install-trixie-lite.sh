@@ -28,6 +28,7 @@ fi
 REPO_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 CONFIG_PATH=/etc/writerdeck/config.toml
 DEFAULT_CONFIG_PATH="$REPO_DIR/config/config.toml"
+DEFAULT_FOOT_CONFIG_PATH="$REPO_DIR/deploy/foot.ini"
 DEFAULT_CONSOLE_BLANK_SECONDS=600
 STATE_DIR=/etc/writerdeck/uninstall
 
@@ -676,6 +677,29 @@ install_config() {
   log "Wrote updated defaults to: ${CONFIG_PATH}.dist"
 }
 
+install_user_foot_config() {
+  foot_config_dir="$TARGET_HOME/.config/foot"
+  foot_config_path="$foot_config_dir/foot.ini"
+  foot_dist_path="$foot_config_dir/foot.ini.dist"
+
+  sudo_if_needed install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$foot_config_dir"
+
+  if [ ! -f "$foot_config_path" ]; then
+    sudo_if_needed install -m 0644 -o "$TARGET_USER" -g "$TARGET_GROUP" "$DEFAULT_FOOT_CONFIG_PATH" "$foot_config_path"
+    log "Installed foot config at $foot_config_path"
+    return
+  fi
+
+  if cmp -s "$DEFAULT_FOOT_CONFIG_PATH" "$foot_config_path"; then
+    log "Foot config already matches defaults: $foot_config_path"
+    return
+  fi
+
+  sudo_if_needed install -m 0644 -o "$TARGET_USER" -g "$TARGET_GROUP" "$DEFAULT_FOOT_CONFIG_PATH" "$foot_dist_path"
+  log "Kept existing foot config: $foot_config_path"
+  log "Wrote updated foot defaults to: $foot_dist_path"
+}
+
 setup_console() {
   log "Configuring console: font=$CONSOLE_FONTSIZE, resolution=$CONSOLE_RESOLUTION, rotation=$CONSOLE_ROTATE"
   
@@ -776,6 +800,7 @@ sudo_if_needed install -d -m 0755 /etc/writerdeck
 sudo_if_needed install -d -m 0755 "$STATE_DIR"
 backup_file_if_missing "$CONFIG_PATH" etc/writerdeck/config.toml
 install_config
+install_user_foot_config
 setup_console
 
 sudo_if_needed install -d -m 0755 /usr/local/bin

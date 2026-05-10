@@ -24,6 +24,7 @@ This installs:
 - `syncthing`
 - `tailscale`
 - WriterDeck scripts/config
+- Foot terminal config at `~/.config/foot/foot.ini`
 - Configurable text-console screen blanking (default `600` seconds)
 
 ### Editor: WordGrinder
@@ -159,6 +160,8 @@ Idempotency notes:
 - If required packages are already installed, installer skips `apt-get update` and `apt-get install`.
 - Existing `/etc/writerdeck/config.toml` is preserved.
 - If repo defaults change, a new `/etc/writerdeck/config.toml.dist` is written for manual merge.
+- Existing `~/.config/foot/foot.ini` is preserved.
+- If the default Foot config changes, a new `~/.config/foot/foot.ini.dist` is written for manual merge.
 - Installer targets the invoking sudo user by default (`$SUDO_USER`) and uses that user's home for writing data.
 - Override target user explicitly with `WRITERDECK_USER=<username> sudo ./scripts/install-trixie-lite.sh`.
 
@@ -183,7 +186,8 @@ sudo systemctl restart getty@tty1
 `wd-session` now runs as a session supervisor:
 
 - Boot/login on `tty1` opens WordGrinder inside a full-screen `cage` + `foot`
-  Wayland terminal.
+  Wayland terminal. `foot` is launched with `--fullscreen` so the terminal
+  surface fills the whole 1024x600 display instead of resizing to a cell grid.
 - The session uses `XKB_DEFAULT_LAYOUT=gb` so UK keyboard symbols are mapped
   correctly.
 - If `cage` or `foot` fails, the session falls back to raw tty WordGrinder and
