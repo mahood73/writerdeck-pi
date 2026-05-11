@@ -1,37 +1,51 @@
 [![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/mahood73/writerdeck-pi?utm_source=oss&utm_medium=github&utm_campaign=mahood73%2Fwriterdeck-pi&labelColor=171717&color=FF570A&label=CodeRabbit+Reviews)](https://coderabbit.ai)
 
-# WriterDeck Toolkit
+# WriterDeck
 
-Implementation of the WriterDeck v2 plan for Raspberry Pi Zero 2W on Debian 13.3 (Trixie) Lite.
+A distraction-free writing appliance for Raspberry Pi Zero 2W running Debian 13 (Trixie) Lite.
 
-## What is included
+Boot the Pi and you're straight into WordGrinder. Quit and a small menu offers reopen, shell, reboot, or poweroff — nothing else. Writing syncs to a home node via Syncthing.
 
-- `bin/wd`: CLI for writing workflow and sync operations.
-- `bin/wd-session`: tty1 session supervisor (editor + exit menu + shell drop).
-- `config/config.toml`: default config contract.
-- `deploy/`: autologin, profile, firewall, and home sync-node templates.
-- `scripts/install-trixie-lite.sh`: MVP install workflow for the deck.
-- `scripts/uninstall-trixie-lite.sh`: removes WriterDeck tty1 integration and restores backed-up system files.
-- `scripts/enable-phase2-two-way.sh`: phase transition helper.
-- `tests/test_wd.py`: CLI behavior tests.
+> **Personal project disclaimer:** This works on my desk, on my hardware, for my writing. It is shared in case it is useful, not as supported software. Back up your writing independently and don't trust this with anything you can't afford to lose.
 
-## CLI commands
+## What's included
 
-- `wd open-latest`
-- `wd new [foldername]`
-- `wd projects`
-- `wd sync status`
-- `wd sync now`
-- `wd sync doctor`
-- `wd sync resolve <path>`
+| Path | Purpose |
+|------|---------|
+| `bin/wd` | CLI for writing workflow and sync |
+| `bin/wd-session` | tty1 session supervisor (editor → menu loop) |
+| `config/config.toml` | Default config |
+| `deploy/` | Autologin, firewall, and sync-node templates |
+| `scripts/install-trixie-lite.sh` | Installer |
+| `scripts/uninstall-trixie-lite.sh` | Uninstaller |
+| `tests/test_wd.py` | CLI tests |
 
-## Config contract
+## Quick start
 
-Default path: `/etc/writerdeck/config.toml`
+1. Read [docs/setup-trixie-lite.md](docs/setup-trixie-lite.md).
+2. Run `sudo ./scripts/install-trixie-lite.sh` on the Pi.
+3. Configure Tailscale and pair a Syncthing folder with your home node.
+4. Reboot — `tty1` opens directly into WordGrinder.
+
+## CLI
+
+```
+wd open-latest           # Open the most recently modified draft
+wd new [folder]          # Start a new draft
+wd projects              # List project folders
+wd sync status           # Show Syncthing sync state
+wd sync now              # Trigger a scan and wait for idle
+wd sync doctor           # Report conflict files
+wd sync resolve <path>   # Open conflicted files for manual merge
+```
+
+Config is read from `/etc/writerdeck/config.toml` by default, or set `WD_CONFIG` to override.
+
+## Config
 
 ```toml
 [paths]
-root = "/home/<pi-user>/Writing"
+root = "/home/<user>/Writing"
 default_project = "inbox"
 
 [editor]
@@ -39,36 +53,16 @@ command = "wordgrinder"
 
 [sync]
 folder_id = "writing"
-mode = "single_writer" # or "two_way"
+mode = "single_writer"   # or "two_way"
 wait_timeout_sec = 180
 ```
 
-## Quick start
+## Session behaviour
 
-1. Read [docs/setup-trixie-lite.md](docs/setup-trixie-lite.md).
-2. Run `sudo ./scripts/install-trixie-lite.sh` on the Pi.
-   The installer targets the invoking sudo user by default (`$SUDO_USER`).
-3. Configure Tailscale and Syncthing folder pairing.
-4. Reboot and verify `tty1` opens directly into WordGrinder.
-5. Quit WordGrinder and verify the WriterDeck menu appears (`w/s/r/p`).
+- `tty1` autologin runs `wd-session`, which opens the editor immediately.
+- Quitting the editor shows a menu: `w` reopen · `s` shell · `r` reboot · `p` poweroff.
+- `tty2+` is a normal login shell.
 
-To remove the tty1 WriterDeck login/session behavior later, run `sudo ./scripts/uninstall-trixie-lite.sh`.
+## Sync
 
-## Session behavior
-
-- `tty1` autologin launches `wd-session`.
-- `wd-session` runs inside `cage` + `foot` when available, with raw tty fallback.
-- Exiting the editor opens a session menu instead of immediate relogin loop.
-- Menu actions:
-  - `w` reopen editor
-  - `s` open shell (type `exit` to return to menu)
-  - `r` reboot (confirmation + sudo/systemd)
-  - `p` poweroff (confirmation + sudo/systemd)
-- `tty2+` remains a normal shell login.
-
-## Phase model
-
-- Phase 1 (default): single-writer (`Send Only` on deck, `Receive Only` on home).
-- Phase 2: two-way sync with conflict preservation and manual merge tooling.
-
-Phase 2 details are in [docs/phase2-two-way.md](docs/phase2-two-way.md).
+Writing syncs to a home node via Syncthing. If you edit on both ends while offline, Syncthing will preserve both versions as conflict copies rather than silently overwriting either — but you'll need to reconcile them manually. Avoid editing the same file on two devices without syncing in between if you can help it.
