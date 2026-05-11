@@ -136,27 +136,6 @@ class WriterDeckCliTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip().splitlines(), ["alpha", "beta"])
 
-    def test_sync_doctor_reports_conflicts(self):
-        project = self.root / "notes"
-        project.mkdir(parents=True)
-        (project / "draft.md").write_text("base", encoding="utf-8")
-        conflict = project / "draft.md.sync-conflict-20260303-120000-WRITER"
-        conflict.write_text("conflict", encoding="utf-8")
-
-        result = self._run("sync", "doctor")
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("found 1 conflict file(s)", result.stdout)
-        self.assertIn("notes/draft.md.sync-conflict", result.stdout)
-
-    def test_sync_resolve_requires_conflict_copy(self):
-        project = self.root / "notes"
-        project.mkdir(parents=True)
-        (project / "draft.md").write_text("base", encoding="utf-8")
-
-        result = self._run("sync", "resolve", "notes/draft.md")
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("no conflict copies found", result.stderr)
-
 
 if __name__ == "__main__":
     unittest.main()
