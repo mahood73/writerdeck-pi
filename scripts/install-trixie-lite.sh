@@ -562,10 +562,6 @@ prompt_console_settings
 prompt_writing_folder
 
 # -----------------------------------------------------------------------------
-# Unprivileged operations (as current user)
-# -----------------------------------------------------------------------------
-
-# -----------------------------------------------------------------------------
 # Privileged operations (via sudo)
 # -----------------------------------------------------------------------------
 
@@ -595,11 +591,13 @@ setup_writing_folder() {
   if [ -d "$WRITING_ROOT" ]; then
     log "Writing folder already exists at $WRITING_ROOT"
   else
-    sudo_if_needed install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$WRITING_ROOT"
-    sudo_if_needed install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$WRITING_ROOT/inbox"
     log "Created writing folder at $WRITING_ROOT"
   fi
 
+  sudo_if_needed install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$WRITING_ROOT"
+  sudo_if_needed install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$WRITING_ROOT/inbox"
+
+  # Test writability as TARGET_USER, not as the installer process (which may be root)
   if ! sudo -u "$TARGET_USER" test -w "$WRITING_ROOT" 2>/dev/null; then
     echo "error: $TARGET_USER cannot write to $WRITING_ROOT" >&2
     echo "Check ownership and permissions: ls -ld $WRITING_ROOT" >&2
