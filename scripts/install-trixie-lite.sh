@@ -396,18 +396,6 @@ prompt_console_settings() {
     echo "Please enter a whole number of seconds, or 0 to disable blanking."
   done
 
-  echo ""
-  echo "Console configuration:"
-  echo "  Resolution: $CONSOLE_RESOLUTION"
-  echo "  Screen orientation: $CONSOLE_ROTATE"
-  echo "  Screen blanking: $CONSOLE_BLANK_SECONDS seconds"
-  echo ""
-  printf "Proceed with these settings? [Y/n]: "
-  read -r confirm
-  case "$confirm" in
-    n|N|no|No) exit 0 ;;
-    *) ;;
-  esac
 }
 
 prompt_writing_folder() {
@@ -560,6 +548,20 @@ fi
 
 prompt_console_settings
 prompt_writing_folder
+
+echo ""
+echo "Configuration:"
+echo "  Resolution: $CONSOLE_RESOLUTION"
+echo "  Screen orientation: $CONSOLE_ROTATE"
+echo "  Screen blanking: $CONSOLE_BLANK_SECONDS seconds"
+echo "  Writing folder: $WRITING_ROOT"
+echo ""
+printf "Proceed with these settings? [Y/n]: "
+read -r confirm
+case "$confirm" in
+  n|N|no|No) exit 0 ;;
+  *) ;;
+esac
 
 # -----------------------------------------------------------------------------
 # Privileged operations (via sudo)
