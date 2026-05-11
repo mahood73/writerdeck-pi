@@ -1,41 +1,42 @@
-# Home Sync Node (Hybrid)
+# Home Sync Node
 
-Primary recommendation: always-on Linux host running Syncthing in Docker, with optional native Linux/macOS mirror clients.
+The home sync node receives and versions everything the WriterDeck sends. The recommended setup is an always-on Linux host running Syncthing in Docker, with optional native clients on other machines for direct access.
 
-## Docker node setup
+## Docker setup
 
-From a host directory:
+Copy the compose template and start it:
 
 ```bash
 cp /path/to/repo/deploy/home-sync-node-compose.yml ./compose.yml
 docker compose up -d
 ```
 
-Local volumes:
+This creates two local volumes:
 
-- `./syncthing-config`
-- `./writerdeck-data`
+- `./syncthing-config` — Syncthing configuration
+- `./writerdeck-data` — writing files
 
-Set Syncthing folder:
+Configure the Syncthing folder:
 
-- Folder id: `writing`
-- Path: `/data/writing`
-- Phase 1 type: `Receive Only`
-- Phase 2 type: `Send & Receive`
-
-Enable staggered versioning and 30-day retention.
+- **Folder ID:** `writing`
+- **Path:** `/data/writing`
+- **Phase 1 type:** `Receive Only`
+- **Phase 2 type:** `Send & Receive`
+- **Versioning:** Staggered, 30-day retention
 
 ## Tailscale
 
-Install and run Tailscale on the host OS (not in container for MVP simplicity):
+Install Tailscale on the host OS (not inside the container):
 
 ```bash
 sudo tailscale up
 ```
 
+This gives the home node a stable tailnet address the Pi can reach from anywhere.
+
 ## Optional native clients
 
-Linux/macOS native Syncthing clients can mirror from the home node for direct editing/review.
+Other machines (desktop, laptop) can run Syncthing natively and mirror from the home node for direct editing or review.
 
-- In Phase 1: keep them read-only.
-- In Phase 2: allow two-way where desired.
+- In Phase 1, keep these clients read-only.
+- In Phase 2, two-way sync can be enabled where needed.

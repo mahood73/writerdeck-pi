@@ -4,6 +4,12 @@ Ideas and follow-up work discovered while testing the WriterDeck as a real
 writing appliance. These are not commitments for the next change; they are the
 parking lot for things worth revisiting after more use.
 
+## Architecture
+
+- Make `wd` sync-agnostic. Currently the CLI is tightly coupled to Syncthing's API (`sync status/now/doctor/resolve`). Writing commands should not need to know about the sync layer. Likely direction: remove sync subcommands from `wd` entirely and let Syncthing run as a standalone daemon. Could also mean a separate `wd-sync` CLI or a pluggable backend, but full separation is cleanest.
+- As part of sync-agnostic work: add a "pick your writing folder" prompt to the installer, defaulting to `~/Writing`. The writing root should be a user choice at install time, not a hardcoded assumption. Some sync tools (e.g. Dropbox) enforce their own folder location, so the installer needs to accommodate paths outside the home directory or in fixed sync roots.
+- Conflict reconciliation. Syncthing preserves both versions of a file when there's a conflict — design a workflow for detecting and merging them. Depends on sync-agnostic direction above.
+
 ## Writing workflow
 
 - Export-on-exit to RTF and TXT.

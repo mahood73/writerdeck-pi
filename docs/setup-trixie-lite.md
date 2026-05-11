@@ -1,57 +1,36 @@
-# Setup: Debian 13.3 (Trixie) Lite on Pi Zero 2W
+# Setup: Debian 13 (Trixie) Lite on Pi Zero 2W
 
-## 1. Base OS and packages
+## 1. Base install
 
-- Flash Debian 13.3 (Trixie) Lite.
-- Boot and connect keyboard + HDMI display.
-- Clone this repo on the device.
-
-Run:
+Flash Debian 13 (Trixie) Lite, boot with keyboard and HDMI attached, then clone this repo on the device and run:
 
 ```bash
 sudo ./scripts/install-trixie-lite.sh
 ```
 
-The installer now prompts for console resolution, rotation, and blanking timeout. On reruns it prefers the current configured values it finds in `/boot/firmware/cmdline.txt` and related console config files, then falls back to live detection where possible.
-
-On current Trixie images it applies forced HDMI mode and rotation through `/boot/firmware/cmdline.txt` with a `video=HDMI-A-1:...` kernel argument instead of relying on legacy `display_rotate`. It also configures the kernel's built-in console blanking with `consoleblank=<seconds>`; the installer default is `600` seconds (10 minutes).
+The installer prompts for console resolution, rotation, and screen blanking timeout. On reruns it detects existing values and preserves them where possible.
 
 This installs:
 
 - `wordgrinder-ncurses`
-- `cage`
-- `foot`
+- `cage` + `foot` (Wayland terminal compositor)
 - `syncthing`
 - `tailscale`
-- WriterDeck scripts/config
+- WriterDeck scripts and config
 - Foot terminal config at `~/.config/foot/foot.ini`
-- Configurable text-console screen blanking (default `600` seconds)
+- Screen blanking via kernel `consoleblank` (default: 600 seconds)
 
-### Editor: WordGrinder
-
-The default WriterDeck editor is WordGrinder. It is a better fit for the
-hardware when the desired feel is closer to a console word processor than a
-programmer's editor.
-
-The low-friction option is the Trixie package, which the installer installs:
+The installer targets `$SUDO_USER` by default. To install for a different user:
 
 ```bash
-sudo apt install wordgrinder-ncurses
+WRITERDECK_USER=<username> sudo ./scripts/install-trixie-lite.sh
 ```
 
-This currently installs WordGrinder 0.8. That is enough for testing the
-workflow and keeps the device tidy. The WriterDeck editor command in
-`/etc/writerdeck/config.toml` should be:
+**Idempotency:** safe to rerun. Existing config files (`/etc/writerdeck/config.toml`, `~/.config/foot/foot.ini`) are preserved; updated defaults are written alongside as `.dist` files for manual comparison.
 
-```toml
-[editor]
-command = "wordgrinder"
-```
+### WordGrinder 0.9 (optional)
 
-WordGrinder 0.9 exists upstream, but is not currently packaged in Trixie. The
-upstream build can be installed into `~/.local` while leaving the apt package
-available as a fallback. Use this only if the 0.9 fixes/features are worth
-building from source.
+The installer pulls WordGrinder 0.8 from the Trixie package archive. That is sufficient for normal use. WordGrinder 0.9 exists upstream but is not packaged — only build it from source if a specific 0.9 fix is needed.
 
 Install build dependencies:
 
@@ -59,26 +38,13 @@ Install build dependencies:
 sudo apt install git build-essential make ninja-build pkg-config python3 libncursesw5-dev zlib1g-dev
 ```
 
-Clone the source:
+Clone and patch (the upstream build tries to materialise Windows/Haiku OpenGL targets, which fail on a console-only device):
 
 ```bash
-mkdir -p ~/src ~/.local/bin ~/.local/man/man1
-cd ~/src
+mkdir -p ~/src && cd ~/src
 git clone https://github.com/davidgiven/wordgrinder.git
 cd wordgrinder
-```
 
-As of the tested 0.9 upstream source, the ncurses-only build may still try to
-materialise Windows/Haiku OpenGL targets. That causes errors such as:
-
-```text
-AssertionError: Required package 'opengl' not installed
-```
-
-Rather than installing the large OpenGL development stack on a console-only
-deck, patch the build target declarations:
-
-```bash
 python3 <<'PY'
 from pathlib import Path
 
@@ -104,207 +70,115 @@ def wrap_block(text, start, end_marker, guard):
     indented = "".join("    " + line if line.strip() else line for line in block.splitlines(True))
     return text[:i] + guard + ":\n" + indented + text[j:]
 
-s = wrap_block(
-    s,
-    'make_wordgrinder(\n    "wordgrinder-wincon",',
-    "\nif HAS_XWORDGRINDER:",
-    "if IS_WINDOWS",
-)
-
-s = wrap_block(
-    s,
-    'make_wordgrinder(\n    "wordgrinder-glfw-windows",',
-    '\nmake_wordgrinder(\n    "wordgrinder-glfw-haiku",',
-    "if IS_WINDOWS",
-)
-
-s = wrap_block(
-    s,
-    'make_wordgrinder(\n    "wordgrinder-glfw-haiku",',
-    "\n",
-    "if HAS_HAIKU",
-)
+s = wrap_block(s, 'make_wordgrinder(\n    "wordgrinder-wincon",', "\nif HAS_XWORDGRINDER:", "if IS_WINDOWS")
+s = wrap_block(s, 'make_wordgrinder(\n    "wordgrinder-glfw-windows",', '\nmake_wordgrinder(\n    "wordgrinder-glfw-haiku",', "if IS_WINDOWS")
+s = wrap_block(s, 'make_wordgrinder(\n    "wordgrinder-glfw-haiku",', "\n", "if HAS_HAIKU")
 
 p.write_text(s)
 PY
 ```
 
-Build and install the ncurses binary:
+Build and install to `~/.local`:
 
 ```bash
 BUILDTYPE=unix-ncurses-only make
 PREFIX="$HOME/.local" BUILDTYPE=unix-ncurses-only make install
 ```
 
-Check which version will run:
-
-```bash
-which wordgrinder
-~/.local/bin/wordgrinder --help
-```
-
-If `which wordgrinder` still shows `/usr/bin/wordgrinder`, either call
-`~/.local/bin/wordgrinder` explicitly from the WriterDeck config or put this
-near the end of `~/.profile`:
+If `which wordgrinder` still points to `/usr/bin/wordgrinder`, add this to `~/.profile`:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Test all editor changes with throwaway documents first. Do not put real writing
-into the deck until export, backup, and sync behavior are verified.
-
-Idempotency notes:
-
-- Safe to rerun; existing packages/users/services are reused.
-- If required packages are already installed, installer skips `apt-get update` and `apt-get install`.
-- Existing `/etc/writerdeck/config.toml` is preserved.
-- If repo defaults change, a new `/etc/writerdeck/config.toml.dist` is written for manual merge.
-- Existing `~/.config/foot/foot.ini` is preserved.
-- If the default Foot config changes, a new `~/.config/foot/foot.ini.dist` is written for manual merge.
-- Installer targets the invoking sudo user by default (`$SUDO_USER`) and uses that user's home for writing data.
-- Override target user explicitly with `WRITERDECK_USER=<username> sudo ./scripts/install-trixie-lite.sh`.
-
-## 2. Configure auto-login + session launch
+## 2. Auto-login and session launch
 
 The installer configures:
 
-- `/etc/systemd/system/getty@tty1.service.d/override.conf` (autologin for selected install user on `tty1`)
-- `/etc/profile.d/wd-session.sh` (launches WriterDeck session only on `tty1`)
+- `/etc/systemd/system/getty@tty1.service.d/override.conf` — autologin on `tty1`
+- `/etc/profile.d/wd-session.sh` — launches WriterDeck session on `tty1` only
 
-The installer also keeps one-time backups of the system files it changes under `/etc/writerdeck/uninstall/`, so the uninstaller can restore the original console and login behavior later.
+Backups of modified system files are kept under `/etc/writerdeck/uninstall/` so the uninstaller can restore them.
 
-Apply and reboot:
+Apply without rebooting:
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl restart getty@tty1
 ```
 
-### tty1 session controls
+### Session behaviour
 
-`wd-session` now runs as a session supervisor:
-
-- Boot/login on `tty1` starts a full-screen `cage` + `foot` Wayland terminal,
-  then runs `wd-session` inside it. `foot` is launched with `--fullscreen` so
-  the terminal surface fills the whole 1024x600 display instead of resizing to
-  a cell grid.
-- The `wd-session` menu, shell, and WordGrinder all run inside the same
-  terminal session.
-- The session uses `XKB_DEFAULT_LAYOUT=gb` so UK keyboard symbols are mapped
-  correctly.
+- `tty1` boots into a full-screen `cage` + `foot` Wayland terminal running `wd-session`.
+- `foot` launches with `--fullscreen` so the terminal fills the display rather than fitting a cell grid.
+- UK keyboard layout is set via `XKB_DEFAULT_LAYOUT=gb`.
 - If `cage` or `foot` is unavailable, the session falls back to raw tty.
-- WordGrinder handles some Alt/function-key combinations itself. If `Alt+F2`
-  does not switch to `tty2` while WordGrinder is open, quit to the WriterDeck
-  menu first, then switch tty.
-- Exiting WordGrinder shows a menu:
-  - `w` reopen editor
-  - `s` open shell
-  - `r` reboot (with confirmation)
-  - `p` poweroff (with confirmation)
-- Exiting the shell returns to this menu.
-- `tty2+` logins are normal shells and do not launch writer session.
+- WordGrinder intercepts some Alt/function-key combinations. If `Alt+F2` does not switch tty while WordGrinder is open, quit to the WriterDeck menu first.
+- `tty2+` is a normal login shell.
 
-### Undo WriterDeck tty1 integration
-
-Run:
+### Uninstalling
 
 ```bash
 sudo ./scripts/uninstall-trixie-lite.sh
 ```
 
-The uninstaller:
-
-- removes the tty1 autologin + `wd-session` hook
-- restores backed-up console/login files when available
-- otherwise removes the WriterDeck-managed `video=HDMI-A-1:...` and `consoleblank=...` kernel args
-- stops and disables `syncthing@<user>.service`
-- removes WriterDeck binaries and config
-- keeps packages and writing data by default
+This removes the tty1 autologin and session hook, restores backed-up system files, stops and disables `syncthing@<user>.service`, and removes WriterDeck binaries and config. Packages and writing data are left in place.
 
 ## 3. Configure Syncthing (Phase 1)
 
-You do not need a desktop on the Pi. Use SSH port forwarding from a machine that has a browser.
+No desktop is needed on the Pi. Access Syncthing via SSH port forwarding.
 
-### 3.1 Verify service is running on WriterDeck
+### 3.1 Verify Syncthing is running
 
 ```bash
 sudo systemctl status "syncthing@$(whoami).service"
 ```
 
-If needed:
+If not running:
 
 ```bash
 sudo systemctl enable --now "syncthing@$(whoami).service"
 ```
 
-### 3.2 Open WriterDeck Syncthing UI through SSH tunnel
+### 3.2 Open the Syncthing UI via SSH tunnel
 
-From your laptop/desktop (not on the Pi), run:
-
-```bash
-ssh -L 58384:127.0.0.1:8384 <pi-user>@<writerdeck-ip-or-hostname>
-```
-
-Then open in your local browser:
-
-- `http://127.0.0.1:58384`
-
-Keep this SSH session open while configuring.
-
-If `58384` is also in use locally, choose any free local port:
+From your laptop or desktop (not on the Pi):
 
 ```bash
-ssh -L <free-local-port>:127.0.0.1:8384 <pi-user>@<writerdeck-ip-or-hostname>
+ssh -L 58384:127.0.0.1:8384 <pi-user>@<writerdeck-ip>
 ```
 
-### 3.3 Configure WriterDeck folder and remote device
+Then open `http://127.0.0.1:58384` in a browser. Keep the SSH session open while configuring.
 
-On WriterDeck:
+### 3.3 Configure the WriterDeck folder
 
-- Create folder id `writing` at `/home/<pi-user>/Writing`
-- Set folder type: `Send Only`
-- Pair with home sync node device id
+In the Syncthing UI on the Pi:
 
-In the Syncthing web UI:
-
-- `Add Folder`
+- **Add Folder**
   - Folder Label: `writing`
-  - Folder ID: `writing` (must match `/etc/writerdeck/config.toml`)
+  - Folder ID: `writing` (must match `sync.folder_id` in `/etc/writerdeck/config.toml`)
   - Folder Path: `/home/<pi-user>/Writing`
   - Folder Type: `Send Only`
-- `Add Remote Device`
-  - Paste home node device ID
-  - Share folder `writing`
+- **Add Remote Device** — paste your home node device ID and share the `writing` folder.
 
-### 3.4 Configure home node and pair back
+### 3.4 Configure the home node
 
-On home node:
-
-- Folder id `writing` at target path
-- Set folder type: `Receive Only`
-- Enable staggered file versioning (30-day retention)
-
-If the home node is remote/headless, tunnel similarly (different local port):
+Tunnel to the home node if needed:
 
 ```bash
 ssh -L 18384:127.0.0.1:8384 <home-user>@<home-node>
 ```
 
-Open:
+In the Syncthing UI on the home node:
 
-- `http://127.0.0.1:18384`
-
-Then:
-
-- Add/accept WriterDeck as a remote device.
-- Add folder:
+- Accept the WriterDeck as a remote device.
+- **Add Folder**
   - Folder ID: `writing`
-  - Folder Path: your storage path (for Docker template, `/data/writing`)
-  - Folder Type: `Receive Only` (Phase 1)
-  - File Versioning: `Staggered`, 30-day retention
+  - Folder Path: your storage path (e.g. `/data/writing` for the Docker template)
+  - Folder Type: `Receive Only`
+  - File Versioning: Staggered, 30-day retention
 
-After both sides are connected, run on WriterDeck:
+Once both sides are connected:
 
 ```bash
 wd sync status
@@ -313,34 +187,33 @@ wd sync now
 
 ## 4. Configure Tailscale
 
-On deck and home node:
+On both the Pi and home node:
 
 ```bash
 sudo tailscale up
 ```
 
-Use tailnet addresses for off-LAN connectivity.
+Use tailnet addresses for connectivity when away from the home LAN.
 
-## 5. Optional firewall baseline
+## 5. Optional firewall
 
-The installer does not install or enable `ufw` by default. If you want the
-repo's optional firewall baseline, install `ufw` and run:
+The installer does not configure a firewall. To apply the repo's baseline ruleset:
 
 ```bash
 sudo apt install ufw
 sudo ./deploy/ufw-writerdeck.sh
 ```
 
-Adjust LAN CIDRs before enabling if your network differs.
+Review the CIDR ranges in the script before enabling if your network differs.
 
 ## 6. Verification checklist
 
-- Reboot device; `tty1` opens into WordGrinder inside `cage` + `foot`.
-- Leave the device idle on `tty1`; the display blanks after the configured timeout and wakes on keypress.
-- Quit WordGrinder; menu appears with `w/s/r/p` options.
-- Choose `s`; shell opens. Type `exit`; menu appears again.
-- `wd new` opens a blank WordGrinder document with the save dialog rooted in `~/Writing/inbox`.
-- `wd new notes` opens a blank WordGrinder document with the save dialog rooted in `~/Writing/notes`.
-- `systemctl status syncthing@$(whoami).service` is `active (running)`.
-- `wd sync status` returns folder status.
-- `wd sync now` completes without timeout.
+- Reboot — `tty1` opens into WordGrinder inside `cage` + `foot`.
+- Leave idle — display blanks after the configured timeout and wakes on keypress.
+- Quit WordGrinder — menu appears with `w/s/r/p` options.
+- Choose `s` — shell opens. Type `exit` — menu reappears.
+- `wd new` — blank WordGrinder document, save dialog rooted in `~/Writing/inbox`.
+- `wd new notes` — blank WordGrinder document, save dialog rooted in `~/Writing/notes`.
+- `systemctl status syncthing@$(whoami).service` — `active (running)`.
+- `wd sync status` — returns folder status without error.
+- `wd sync now` — completes without timeout.
