@@ -635,6 +635,18 @@ is_managed_legacy_config() {
   return 0
 }
 
+is_managed_writing_sync_config() {
+  config_path=$1
+
+  [ -f "$config_path" ] || return 1
+  grep -q "^root = \"$TARGET_HOME/Writing\"$" "$config_path" || return 1
+  grep -q '^default_project = "inbox"$' "$config_path" || return 1
+  grep -q '^command = "wordgrinder"$' "$config_path" || return 1
+  grep -q '^folder_id = "writing"$' "$config_path" || return 1
+  grep -q '^mode = "single_writer"$' "$config_path" || return 1
+  return 0
+}
+
 install_config() {
   rendered_default=$(mktemp)
   render_default_config "$rendered_default"
@@ -648,7 +660,8 @@ install_config() {
   
   if cmp -s "$DEFAULT_CONFIG_PATH" "$CONFIG_PATH" \
     || is_managed_sync_writerdeck_config "$CONFIG_PATH" \
-    || is_managed_legacy_config "$CONFIG_PATH"; then
+    || is_managed_legacy_config "$CONFIG_PATH" \
+    || is_managed_writing_sync_config "$CONFIG_PATH"; then
     sudo_if_needed install -m 0644 "$CONFIG_PATH" "${CONFIG_PATH}.bak"
     sudo_if_needed install -m 0644 "$rendered_default" "$CONFIG_PATH"
     rm -f "$rendered_default"
