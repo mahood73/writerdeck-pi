@@ -410,6 +410,44 @@ prompt_console_settings() {
   esac
 }
 
+prompt_writing_folder() {
+  echo ""
+  echo "Writing folder:"
+
+  while true; do
+    printf "Writing folder [~/Writing]: "
+    read -r folder_input
+
+    if [ -z "$folder_input" ]; then
+      WRITING_ROOT="$TARGET_HOME/Writing"
+      break
+    fi
+
+    # Expand a leading ~/ or bare ~ against the target user's home
+    case "$folder_input" in
+      "~/"*) folder_input="$TARGET_HOME/${folder_input#~/}" ;;
+      "~")   folder_input="$TARGET_HOME" ;;
+    esac
+
+    WRITING_ROOT="$folder_input"
+
+    # Warn if path falls outside target user's home
+    case "$WRITING_ROOT" in
+      "$TARGET_HOME/"*|"$TARGET_HOME")
+        break
+        ;;
+      *)
+        printf "Warning: this path is outside your home directory. Are you sure? [y/N]: "
+        read -r confirm
+        case "$confirm" in
+          y|Y|yes|YES) break ;;
+          *) echo "Cancelled. Please enter a different path." ;;
+        esac
+        ;;
+    esac
+  done
+}
+
 set_config_key() {
   config_path=$1
   key=$2
@@ -521,16 +559,11 @@ if [ -z "$TARGET_HOME" ] || [ ! -d "$TARGET_HOME" ]; then
 fi
 
 prompt_console_settings
+prompt_writing_folder
 
 # -----------------------------------------------------------------------------
 # Unprivileged operations (as current user)
 # -----------------------------------------------------------------------------
-
-# Create writing directory structure in user's sync tree
-WRITING_ROOT="$TARGET_HOME/Writing"
-sudo_if_needed install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$WRITING_ROOT"
-sudo_if_needed install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$WRITING_ROOT/inbox"
-log "Created writing directory at $WRITING_ROOT"
 
 # -----------------------------------------------------------------------------
 # Privileged operations (via sudo)
@@ -558,9 +591,25 @@ install_required_packages() {
   DEBIAN_FRONTEND=noninteractive sudo_if_needed apt-get install -y --no-install-recommends $missing_packages
 }
 
+setup_writing_folder() {
+  if [ -d "$WRITING_ROOT" ]; then
+    log "Writing folder already exists at $WRITING_ROOT"
+  else
+    sudo_if_needed install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$WRITING_ROOT"
+    sudo_if_needed install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "$WRITING_ROOT/inbox"
+    log "Created writing folder at $WRITING_ROOT"
+  fi
+
+  if ! sudo -u "$TARGET_USER" test -w "$WRITING_ROOT" 2>/dev/null; then
+    echo "error: $TARGET_USER cannot write to $WRITING_ROOT" >&2
+    echo "Check ownership and permissions: ls -ld $WRITING_ROOT" >&2
+    exit 1
+  fi
+}
+
 render_default_config() {
   destination=$1
-  sed "s|^root = \"/home/writer/Writing\"$|root = \"$WRITING_ROOT\"|" \
+  sed "s|^root = \"~/Writing\"$|root = \"$WRITING_ROOT\"|" \
     "$DEFAULT_CONFIG_PATH" > "$destination"
 }
 
@@ -735,6 +784,7 @@ install_required_packages
 sudo_if_needed install -d -m 0755 /etc/writerdeck
 sudo_if_needed install -d -m 0755 "$STATE_DIR"
 backup_file_if_missing "$CONFIG_PATH" etc/writerdeck/config.toml
+setup_writing_folder
 install_config
 install_user_foot_config
 setup_console
