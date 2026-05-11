@@ -34,7 +34,6 @@ class Config:
         self.editor_command = _read_required(raw, "editor", "command")
 
 
-
 def _read_required(raw: dict, section: str, key: str):
     section_data = raw.get(section)
     if not isinstance(section_data, dict):
@@ -112,7 +111,6 @@ def _is_wordgrinder_command(editor_command: str) -> bool:
     if not cmd:
         return False
     return Path(cmd[0]).name in {"wordgrinder", "xwordgrinder"}
-
 
 
 def cmd_open_latest(cfg: Config, _args: argparse.Namespace) -> int:
