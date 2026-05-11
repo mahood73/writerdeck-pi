@@ -1,12 +1,6 @@
 [paths]
-# Installer rewrites this template path to the selected target user's home.
-root = "/home/writer/Writing"
+root = "~/Writing"
 default_project = "inbox"
 
 [editor]
 command = "wordgrinder"
-
-[sync]
-folder_id = "writing"
-mode = "single_writer"
-wait_timeout_sec = 180
