@@ -49,11 +49,6 @@ class WriterDeckCliTests(unittest.TestCase):
 
             [editor]
             command = \"{editor_command}\"
-
-            [sync]
-            folder_id = \"writing\"
-            mode = \"single_writer\"
-            wait_timeout_sec = 2
             """
         ).strip()
         self.config_path.write_text(content, encoding="utf-8")
