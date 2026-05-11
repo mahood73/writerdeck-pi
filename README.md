@@ -65,4 +65,4 @@ wait_timeout_sec = 180
 
 ## Sync
 
-Writing syncs to a home node via Syncthing. If you edit on both ends while offline, Syncthing will preserve both versions as conflict copies rather than silently overwriting either — but you'll need to reconcile them manually. Avoid editing the same file on two devices without syncing in between if you can help it.
+WriterDeck is offline-first. Network access is used only for sync — the device writes locally and Syncthing carries files to a home node when a connection is available. If you edit on both ends while offline, Syncthing will preserve both versions as conflict copies rather than silently overwriting either — but you'll need to reconcile them manually. Avoid editing the same file on two devices without syncing in between if you can help it.
