@@ -33,10 +33,6 @@ Boot the Pi and you're straight into WordGrinder. Quit and a small menu offers r
 wd open-latest           # Open the most recently modified draft
 wd new [folder]          # Start a new draft
 wd projects              # List project folders
-wd sync status           # Show Syncthing sync state
-wd sync now              # Trigger a scan and wait for idle
-wd sync doctor           # Report conflict files
-wd sync resolve <path>   # Open conflicted files for manual merge
 ```
 
 Config is read from `/etc/writerdeck/config.toml` by default, or set `WD_CONFIG` to override.
@@ -45,16 +41,11 @@ Config is read from `/etc/writerdeck/config.toml` by default, or set `WD_CONFIG`
 
 ```toml
 [paths]
-root = "/home/<user>/Writing"
+root = "~/Writing"
 default_project = "inbox"
 
 [editor]
 command = "wordgrinder"
-
-[sync]
-folder_id = "writing"
-mode = "single_writer"   # or "two_way"
-wait_timeout_sec = 180
 ```
 
 ## Session behaviour
@@ -65,4 +56,4 @@ wait_timeout_sec = 180
 
 ## Sync
 
-WriterDeck is offline-first. Network access is used only for sync — the device writes locally and Syncthing carries files to a home node when a connection is available. If you edit on both ends while offline, Syncthing will preserve both versions as conflict copies rather than silently overwriting either — but you'll need to reconcile them manually. Avoid editing the same file on two devices without syncing in between if you can help it.
+WriterDeck writes locally. Point any sync tool (Syncthing, Dropbox, Nextcloud, etc.) at your writing folder and it will carry files to other devices. WriterDeck has no opinion about which tool you use.
