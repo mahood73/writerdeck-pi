@@ -137,28 +137,31 @@ class WriterDeckCliTests(unittest.TestCase):
         docs: list of (name, content) tuples, one per document.
         Returns the bin directory Path — prepend to PATH when calling _run.
         """
+        import json as _json
         fake_bin = Path(self.tmp.name) / "wg-bin"
         fake_bin.mkdir(exist_ok=True)
+
+        data_file = fake_bin / "docs.json"
+        data_file.write_text(_json.dumps(docs), encoding="utf-8")
+
         fake_wg = fake_bin / "wordgrinder"
-
-        # Build a Python fake that writes files and prints docname\tpath pairs
-        doc_lines = []
-        for i, (name, content) in enumerate(docs, 1):
-            idx = f"{i:03d}"
-            doc_lines.append(f"    pathlib.Path(tmpdir, '{idx}.txt').write_text({content!r}, encoding='utf-8')")
-            doc_lines.append(f"    print({name!r} + '\\t' + str(pathlib.Path(tmpdir, '{idx}.txt')))")
-
-        body = "\n".join(doc_lines) if doc_lines else "    pass"
-        lines = [
-            "#!/usr/bin/env python3",
-            "import sys, pathlib",
-            "if len(sys.argv) >= 2 and sys.argv[1] == '--lua':",
-            "    tmpdir = sys.argv[4]",
-            body,
-            "sys.exit(0)",
-            "",
-        ]
-        script = "\n".join(lines)
+        data_path_repr = repr(str(data_file))
+        script = (
+            "#!/usr/bin/env python3\n"
+            "import sys, pathlib, json\n"
+            "if len(sys.argv) >= 2 and sys.argv[1] == '--lua':\n"
+            f"    data_file = pathlib.Path({data_path_repr})\n"
+            "    wg_path = sys.argv[3]\n"
+            "    tmpdir = sys.argv[4]\n"
+            "    docs = json.loads(data_file.read_text(encoding='utf-8'))\n"
+            "    for i, (name, content) in enumerate(docs, 1):\n"
+            "        idx = f'{i:03d}'\n"
+            "        out = pathlib.Path(tmpdir, idx + '.txt')\n"
+            "        out.write_text(content, encoding='utf-8')\n"
+            "        print(name + '\\t' + str(out))\n"
+            "    sys.exit(0)\n"
+            "sys.exit(0)\n"
+        )
         fake_wg.write_text(script, encoding="utf-8")
         fake_wg.chmod(fake_wg.stat().st_mode | stat.S_IXUSR)
         return fake_bin
@@ -277,6 +280,27 @@ class WriterDeckCliTests(unittest.TestCase):
         result2 = self._run_export(fake_wg_bin, str(draft))
         self.assertEqual(result2.returncode, 0, result2.stderr)
         self.assertNotIn("Tip:", result2.stdout)
+
+
+    def test_export_wordgrinder_failure_returns_error(self):
+        draft_dir = self.root / "inbox"
+        draft_dir.mkdir(parents=True)
+        draft = draft_dir / "draft.wg"
+        draft.write_text("", encoding="utf-8")
+
+        # Create a fake wordgrinder that exits non-zero
+        fake_bin = Path(self.tmp.name) / "wg-bin"
+        fake_bin.mkdir(exist_ok=True)
+        fake_wg = fake_bin / "wordgrinder"
+        fake_wg.write_text(
+            "#!/usr/bin/env python3\nimport sys\nsys.stderr.write('export failed\\n')\nsys.exit(1)\n",
+            encoding="utf-8",
+        )
+        fake_wg.chmod(fake_wg.stat().st_mode | stat.S_IXUSR)
+
+        result = self._run_export(fake_bin, str(draft))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("error", result.stderr)
 
 
 if __name__ == "__main__":
