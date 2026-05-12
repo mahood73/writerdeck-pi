@@ -10,14 +10,18 @@ local function main(inputfile, tmpdir)
         os.exit(1)
     end
     local docs = documentSet:getDocumentList()
+    if #docs == 0 then
+        io.stderr:write("wd-export: no documents found in " .. inputfile .. "\n")
+        os.exit(1)
+    end
     for i, doc in ipairs(docs) do
         local outpath = string.format("%s/%03d.txt", tmpdir, i)
-        Document = doc
+        Document = doc  -- WordGrinder API: set active document before export
         if not Cmd.ExportTextFile(outpath) then
             io.stderr:write("wd-export: failed to write " .. outpath .. "\n")
             os.exit(1)
         end
-        print(doc.name .. "\t" .. outpath)
+        print((doc.name or "(unnamed)") .. "\t" .. outpath)
     end
 end
 
