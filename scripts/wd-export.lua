@@ -9,7 +9,7 @@ local function main(inputfile, tmpdir)
         io.stderr:write("wd-export: failed to load " .. inputfile .. "\n")
         os.exit(1)
     end
-    local docs = documentSet:getDocumentList()
+    local docs = DocumentSet:getDocumentList()
     if #docs == 0 then
         io.stderr:write("wd-export: no documents found in " .. inputfile .. "\n")
         os.exit(1)
