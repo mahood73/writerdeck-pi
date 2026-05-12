@@ -92,7 +92,7 @@ def _find_all_drafts(root: Path) -> list[Path]:
     return sorted(path for path in root.rglob("*.wg") if path.is_file())
 
 
-def _export_wg(wg_path: Path) -> list[Path]:
+def _export_wg(wg_path: Path) -> Path:
     lua_script = _wd_export_lua_path()
     tmpdir = Path(tempfile.mkdtemp())
     try:
@@ -125,7 +125,7 @@ def _export_wg(wg_path: Path) -> list[Path]:
         exports_dir.mkdir(exist_ok=True)
         out_path = exports_dir / f"{wg_path.stem}.txt"
         out_path.write_text("\n\n".join(combined) + "\n", encoding="utf-8")
-        return [out_path]
+        return out_path
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -202,17 +202,21 @@ def cmd_projects(cfg: Config, _args: argparse.Namespace) -> int:
 
 
 def cmd_export(cfg: Config, args: argparse.Namespace) -> int:
-    if args.path and args.all:
+    if args.path and args.export_all:
         print("error: 'path' and '--all' are mutually exclusive", file=sys.stderr)
         return 1
 
-    if args.all:
+    if args.export_all:
         targets = _find_all_drafts(cfg.root)
         if not targets:
             print("error: no .wg files found under", cfg.root, file=sys.stderr)
             return 1
     elif args.path:
-        targets = [Path(args.path)]
+        p = Path(args.path)
+        if not p.is_file():
+            print(f"error: file not found: {p}", file=sys.stderr)
+            return 1
+        targets = [p]
     else:
         latest = _find_latest_draft(cfg.root)
         if latest is None:
@@ -220,17 +224,17 @@ def cmd_export(cfg: Config, args: argparse.Namespace) -> int:
             return 1
         targets = [latest]
 
-    default_invocation = not args.path and not args.all
+    default_invocation = not args.path and not args.export_all
 
+    errors = []
     for wg_path in targets:
         print(f"Exporting: {wg_path}")
         try:
-            output_paths = _export_wg(wg_path)
+            out_path = _export_wg(wg_path)
+            print(f"  → {out_path}")
         except WriterDeckError as exc:
             print(f"error: {exc}", file=sys.stderr)
-            return 1
-        for out in output_paths:
-            print(f"  → {out}")
+            errors.append(wg_path)
 
     if default_invocation:
         print(
@@ -238,7 +242,7 @@ def cmd_export(cfg: Config, args: argparse.Namespace) -> int:
             " 'wd export --all' for everything."
         )
 
-    return 0
+    return 1 if errors else 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -263,7 +267,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     export_cmd = subparsers.add_parser("export", help="Export drafts to TXT")
     export_cmd.add_argument("path", nargs="?", help="Path to a .wg file (default: most recent)")
-    export_cmd.add_argument("--all", action="store_true", dest="all", help="Export all .wg files under the writing root")
+    export_cmd.add_argument("--all", action="store_true", dest="export_all", help="Export all .wg files under the writing root")
     export_cmd.set_defaults(func=cmd_export)
 
     return parser
