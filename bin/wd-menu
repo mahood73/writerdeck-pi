@@ -1,0 +1,493 @@
+#!/usr/bin/env python3
+"""WriterDeck launcher menu."""
+
+from __future__ import annotations
+
+import curses
+import os
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover
+    print("error: Python 3.11+ required", file=sys.stderr)
+    sys.exit(2)
+
+CONFIG_PATH = Path(os.environ.get("WD_CONFIG", "/etc/writerdeck/config.toml"))
+WD_BIN = Path(__file__).resolve().parent / "wd"
+
+
+# ---------------------------------------------------------------------------
+# Config helpers
+# ---------------------------------------------------------------------------
+
+def load_config() -> dict:
+    try:
+        with open(CONFIG_PATH, "rb") as f:
+            return tomllib.load(f)
+    except Exception:
+        return {}
+
+
+def write_config_value(section: str, key: str, value: str) -> None:
+    """Update section.key = value in CONFIG_PATH, adding section/key if absent."""
+    try:
+        lines = CONFIG_PATH.read_text(encoding="utf-8").splitlines(keepends=True)
+    except FileNotFoundError:
+        lines = []
+
+    section_header = f"[{section}]"
+    key_line = f"{key} = {value}\n"
+    key_prefix = f"{key} ="
+    key_prefix2 = f"{key}="
+
+    # Locate section
+    section_idx = None
+    for i, line in enumerate(lines):
+        if line.strip() == section_header:
+            section_idx = i
+            break
+
+    if section_idx is None:
+        # Append new section
+        if lines and not lines[-1].endswith("\n"):
+            lines.append("\n")
+        lines += [f"\n{section_header}\n", key_line]
+        CONFIG_PATH.write_text("".join(lines), encoding="utf-8")
+        return
+
+    # Find end of section
+    next_section = len(lines)
+    for i in range(section_idx + 1, len(lines)):
+        s = lines[i].strip()
+        if s.startswith("[") and s.endswith("]"):
+            next_section = i
+            break
+
+    # Look for existing key
+    for i in range(section_idx + 1, next_section):
+        s = lines[i].strip()
+        if s.startswith(key_prefix) or s.startswith(key_prefix2):
+            lines[i] = key_line
+            CONFIG_PATH.write_text("".join(lines), encoding="utf-8")
+            return
+
+    # Key absent — insert after section header
+    lines.insert(section_idx + 1, key_line)
+    CONFIG_PATH.write_text("".join(lines), encoding="utf-8")
+
+
+def list_wg_files(root: Path) -> list[Path]:
+    """All .wg files under root, newest first."""
+    try:
+        return sorted(root.rglob("*.wg"), key=lambda p: p.stat().st_mtime, reverse=True)
+    except Exception:
+        return []
+
+
+# ---------------------------------------------------------------------------
+# Menu data
+# ---------------------------------------------------------------------------
+
+@dataclass
+class MenuItem:
+    key: str        # single-character shortcut (lowercase)
+    label: str
+    action: str     # identifier returned when item is activated
+    submenu: list["MenuItem"] | None = None
+    value: str | None = None  # shown right-aligned before the indicator
+
+
+EXPORT_MENU = [
+    MenuItem("l", "Latest draft", "export_latest"),
+    MenuItem("a", "All drafts", "export_all"),
+    MenuItem("p", "Pick a file", "export_pick"),
+]
+
+SETTINGS_MENU = [
+    MenuItem("b", "Screen blank timeout", "settings_blank"),
+    MenuItem("k", "Keyboard layout", "settings_kbd"),
+]
+
+MAIN_MENU = [
+    MenuItem("w", "Write", "write"),
+    MenuItem("e", "Export", "export", submenu=EXPORT_MENU),
+    MenuItem(",", "Settings", "settings", submenu=SETTINGS_MENU),
+    MenuItem("s", "Shell", "shell"),
+    MenuItem("r", "Reboot", "reboot"),
+    MenuItem("p", "Poweroff", "poweroff"),
+]
+
+
+# ---------------------------------------------------------------------------
+# Key handling (pure — testable without curses)
+# ---------------------------------------------------------------------------
+
+def handle_key(key: int, items: list[MenuItem], selected: int) -> tuple[int, str | None]:
+    """Process a keypress. Returns (new_selected, action_or_none).
+
+    action_or_none is set when an item should be activated; None means just
+    a navigation move (or unrecognised key). The sentinel "back" means ESC.
+    """
+    if key == curses.KEY_UP:
+        return (selected - 1) % len(items), None
+    if key == curses.KEY_DOWN:
+        return (selected + 1) % len(items), None
+    if key in (curses.KEY_ENTER, ord("\n"), ord("\r"), curses.KEY_RIGHT):
+        return selected, items[selected].action
+    if key in (27, ord("q"), curses.KEY_LEFT):
+        return selected, "back"
+    # Letter shortcut
+    if 0 < key < 256:
+        ch = chr(key).lower()
+        for i, item in enumerate(items):
+            if item.key.lower() == ch:
+                return i, item.action
+    return selected, None
+
+
+# ---------------------------------------------------------------------------
+# Drawing helpers
+# ---------------------------------------------------------------------------
+
+def _box_dims(title: str, items: list[MenuItem]) -> tuple[int, int]:
+    """Return (height, width) for a menu box."""
+    def _item_width(item: MenuItem) -> int:
+        val = f" [{item.value}]" if item.value else ""
+        return len(f" {item.key.upper()}  {item.label}{val}  ")
+    content_width = max(_item_width(item) for item in items)
+    width = max(content_width, len(title) + 4) + 2
+    height = len(items) + 2
+    return height, width
+
+
+def draw_menu(stdscr, y: int, x: int, title: str, items: list[MenuItem], selected: int) -> None:
+    """Draw a bordered menu box at (y, x)."""
+    height, width = _box_dims(title, items)
+    rows, cols = stdscr.getmaxyx()
+    if y + height > rows or x + width > cols or y < 0 or x < 0:
+        return
+
+    win = curses.newwin(height, width, y, x)
+    win.border()
+    win.addstr(0, 2, f" {title} ")
+
+    for i, item in enumerate(items):
+        attr = curses.A_REVERSE if i == selected else curses.A_NORMAL
+        key_str = f" {item.key.upper()} "
+        indicator = " >" if item.submenu else "  "
+        val_str = f" [{item.value}]" if item.value else ""
+        label_width = width - 2 - len(key_str) - len(val_str) - len(indicator)
+        label_str = f" {item.label}".ljust(label_width)
+        try:
+            win.addstr(i + 1, 1, key_str, attr | curses.A_BOLD)
+            win.addstr(i + 1, 1 + len(key_str), label_str + val_str + indicator, attr)
+        except curses.error:
+            pass
+
+    win.noutrefresh()
+
+
+# ---------------------------------------------------------------------------
+# Sub-dialogs
+# ---------------------------------------------------------------------------
+
+def confirm(stdscr, prompt: str) -> bool:
+    """Show a Y/N confirmation. Returns True if confirmed."""
+    rows, cols = stdscr.getmaxyx()
+    width = len(prompt) + 10
+    height = 3
+    y = (rows - height) // 2
+    x = (cols - width) // 2
+    win = curses.newwin(height, width, y, x)
+    win.border()
+    win.addstr(1, 2, f"{prompt} [y/N] ")
+    win.refresh()
+    curses.echo()
+    curses.curs_set(1)
+    ch = win.getch()
+    curses.noecho()
+    curses.curs_set(0)
+    return chr(ch).lower() == "y" if 0 < ch < 256 else False
+
+
+def edit_value(stdscr, prompt: str, current: str) -> str | None:
+    """Inline text editor. Returns new value string, or None if cancelled."""
+    rows, cols = stdscr.getmaxyx()
+    width = max(len(prompt) + len(current) + 8, 40)
+    height = 3
+    y = (rows - height) // 2
+    x = (cols - width) // 2
+    win = curses.newwin(height, width, y, x)
+    win.border()
+    win.addstr(1, 2, f"{prompt}: ")
+    win.refresh()
+    curses.echo()
+    curses.curs_set(1)
+    try:
+        val = win.getstr(1, len(prompt) + 4, width - len(prompt) - 6)
+        result = val.decode("utf-8", errors="replace").strip()
+    except Exception:
+        result = None
+    curses.noecho()
+    curses.curs_set(0)
+    return result if result else None
+
+
+def pick_file(stdscr, root: Path) -> Path | None:
+    """Scrollable file picker. Returns selected Path or None."""
+    files = list_wg_files(root)
+    if not files:
+        _flash_message(stdscr, "No .wg files found.")
+        return None
+
+    selected = 0
+    offset = 0
+    rows, cols = stdscr.getmaxyx()
+    max_visible = max(rows - 6, 3)
+    width = min(cols - 4, max(len(str(f.relative_to(root.parent))) for f in files) + 4)
+    height = min(len(files), max_visible) + 2
+    y = (rows - height) // 2
+    x = (cols - width) // 2
+
+    while True:
+        win = curses.newwin(height, width, y, x)
+        win.border()
+        win.addstr(0, 2, " Select file ")
+        visible = files[offset:offset + max_visible]
+        for i, f in enumerate(visible):
+            label = str(f.relative_to(root.parent))
+            label = label[:width - 4].ljust(width - 4)
+            attr = curses.A_REVERSE if offset + i == selected else curses.A_NORMAL
+            try:
+                win.addstr(i + 1, 1, label, attr)
+            except curses.error:
+                pass
+        win.refresh()
+
+        key = stdscr.getch()
+        if key == curses.KEY_UP:
+            selected = max(0, selected - 1)
+            if selected < offset:
+                offset = selected
+        elif key == curses.KEY_DOWN:
+            selected = min(len(files) - 1, selected + 1)
+            if selected >= offset + max_visible:
+                offset = selected - max_visible + 1
+        elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
+            return files[selected]
+        elif key in (27, ord("q")):
+            return None
+
+
+def _flash_message(stdscr, msg: str) -> None:
+    rows, cols = stdscr.getmaxyx()
+    width = len(msg) + 4
+    height = 3
+    y = (rows - height) // 2
+    x = (cols - width) // 2
+    win = curses.newwin(height, width, y, x)
+    win.border()
+    win.addstr(1, 2, msg)
+    win.refresh()
+    stdscr.getch()
+
+
+# ---------------------------------------------------------------------------
+# Actions
+# ---------------------------------------------------------------------------
+
+def _run_wd(*args: str) -> int:
+    result = subprocess.run([sys.executable, str(WD_BIN), *args], check=False)
+    return result.returncode
+
+
+def run_editor(stdscr) -> None:
+    """Suspend curses, run wd open-latest, restore."""
+    curses.endwin()
+    try:
+        _run_wd("open-latest")
+    finally:
+        stdscr.refresh()
+        curses.doupdate()
+
+
+def run_shell(stdscr) -> None:
+    """Suspend curses, drop to shell, restore."""
+    curses.endwin()
+    try:
+        env = os.environ.copy()
+        env["WD_NO_AUTOSESSION"] = "1"
+        shell = env.get("SHELL", "/bin/sh")
+        print("\nOpening shell. Type 'exit' to return to WriterDeck menu.")
+        subprocess.run([shell, "-l"], env=env, check=False)
+    finally:
+        stdscr.refresh()
+        curses.doupdate()
+
+
+def power_action(action: str) -> None:
+    for cmd in (["sudo", "-n", "systemctl", action], ["systemctl", action]):
+        result = subprocess.run(cmd, check=False)
+        if result.returncode == 0:
+            return
+
+
+def handle_export(stdscr) -> None:
+    rows, cols = stdscr.getmaxyx()
+    height, width = _box_dims("Export", EXPORT_MENU)
+    y = (rows - height) // 2
+    x = (cols - width) // 2
+
+    selected = 0
+    while True:
+        stdscr.erase()
+        stdscr.noutrefresh()
+        draw_menu(stdscr, y, x, "Export", EXPORT_MENU, selected)
+        curses.doupdate()
+        key = stdscr.getch()
+        selected, action = handle_key(key, EXPORT_MENU, selected)
+        if action is None:
+            continue
+        if action == "back":
+            return
+        curses.endwin()
+        try:
+            if action == "export_latest":
+                _run_wd("export")
+                input("\nExport complete. Press Enter to continue.")
+            elif action == "export_all":
+                _run_wd("export", "--all")
+                input("\nExport complete. Press Enter to continue.")
+            elif action == "export_pick":
+                cfg = load_config()
+                root = Path(cfg.get("paths", {}).get("root", "~/Writing")).expanduser()
+                stdscr.refresh()
+                curses.doupdate()
+                path = pick_file(stdscr, root)
+                if path:
+                    curses.endwin()
+                    _run_wd("export", str(path))
+                    input("\nExport complete. Press Enter to continue.")
+        finally:
+            stdscr.refresh()
+            curses.doupdate()
+        return
+
+
+def handle_settings(stdscr) -> None:
+    selected = 0
+    while True:
+        rows, cols = stdscr.getmaxyx()
+        cfg = load_config()
+        blank = str(cfg.get("display", {}).get("blank_timeout", 600))
+        kbd = os.environ.get("WD_XKB_LAYOUT", cfg.get("session", {}).get("keyboard_layout", "gb"))
+
+        annotated = [
+            MenuItem("b", "Screen blank timeout", "settings_blank", value=f"{blank}s"),
+            MenuItem("k", "Keyboard layout", "settings_kbd", value=kbd),
+        ]
+
+        height, width = _box_dims("Settings", annotated)
+        y = (rows - height) // 2
+        x = (cols - width) // 2
+        stdscr.erase()
+        stdscr.noutrefresh()
+        draw_menu(stdscr, y, x, "Settings", annotated, selected)
+        curses.doupdate()
+        key = stdscr.getch()
+        selected, action = handle_key(key, annotated, selected)
+        if action is None:
+            continue
+        if action == "back":
+            return
+        if action == "settings_blank":
+            val = edit_value(stdscr, "Blank timeout (seconds, 0=off)", blank)
+            if val is not None and val.isdigit():
+                write_config_value("display", "blank_timeout", val)
+                _restart_swayidle(val)
+        elif action == "settings_kbd":
+            val = edit_value(stdscr, "Keyboard layout (e.g. gb, us)", kbd)
+            if val is not None:
+                safe = val.replace("\\", "\\\\").replace('"', '\\"')
+                write_config_value("session", "keyboard_layout", f'"{safe}"')
+                _flash_message(stdscr, "Takes effect on next boot.")
+
+
+def _restart_swayidle(blank_timeout: str) -> None:
+    """Kill existing swayidle and relaunch with new timeout if non-zero."""
+    subprocess.run(["pkill", "-x", "swayidle"], check=False)
+    if blank_timeout != "0":
+        wayland = os.environ.get("WAYLAND_DISPLAY", "")
+        if wayland:
+            subprocess.Popen(
+                [
+                    "swayidle", "-w",
+                    "timeout", blank_timeout,
+                    f"WAYLAND_DISPLAY={wayland} wlopm --off \\*",
+                    "resume",
+                    f"WAYLAND_DISPLAY={wayland} wlopm --on \\*",
+                ]
+            )
+
+
+# ---------------------------------------------------------------------------
+# Main loop
+# ---------------------------------------------------------------------------
+
+def run_menu(stdscr, title: str, items: list[MenuItem], allow_back: bool = False) -> str | None:
+    """Run an interactive menu. Returns the activated action string."""
+    selected = 0
+    while True:
+        rows, cols = stdscr.getmaxyx()
+        height, width = _box_dims(title, items)
+        y = max(0, (rows - height) // 2)
+        x = max(0, (cols - width) // 2)
+        stdscr.erase()
+        stdscr.noutrefresh()
+        draw_menu(stdscr, y, x, title, items, selected)
+        curses.doupdate()
+        key = stdscr.getch()
+        selected, action = handle_key(key, items, selected)
+        if action == "back":
+            return None
+        if action is not None:
+            return action
+
+
+def run(stdscr) -> None:
+    curses.curs_set(0)
+    curses.use_default_colors()
+
+    cfg = load_config()
+    if cfg.get("session", {}).get("start_mode", "resume") == "resume":
+        run_editor(stdscr)
+
+    while True:
+        action = run_menu(stdscr, "WriterDeck", MAIN_MENU)
+        if action == "write":
+            run_editor(stdscr)
+        elif action == "export":
+            handle_export(stdscr)
+        elif action == "settings":
+            handle_settings(stdscr)
+        elif action == "shell":
+            run_shell(stdscr)
+        elif action == "reboot":
+            if confirm(stdscr, "Reboot?"):
+                power_action("reboot")
+        elif action == "poweroff":
+            if confirm(stdscr, "Poweroff?"):
+                power_action("poweroff")
+
+
+def main() -> None:
+    curses.wrapper(run)
+
+
+if __name__ == "__main__":
+    main()

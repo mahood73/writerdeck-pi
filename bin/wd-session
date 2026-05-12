@@ -1,102 +1,13 @@
 #!/bin/sh
+# Thin wrapper: handles non-interactive TTY detection, then delegates to wd-menu.
 set -eu
 
-open_shell() {
-  shell_bin=${SHELL:-/bin/bash}
-  if [ ! -x "$shell_bin" ]; then
-    shell_bin=/bin/sh
-  fi
-
-  echo
-  echo "Opening shell. Type 'exit' to return to WriterDeck menu."
-  WD_NO_AUTOSESSION=1 "$shell_bin" -l || true
-}
-
-confirm_action() {
-  prompt=$1
-  printf "%s [y/N]: " "$prompt"
-  read -r response || return 1
-  case "$response" in
-    y|Y|yes|YES) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
-run_power_action() {
-  action=$1
-
-  if ! confirm_action "Confirm ${action}?"; then
-    echo "${action} canceled."
-    return 0
-  fi
-
-  if command -v sudo >/dev/null 2>&1; then
-    if sudo -n true >/dev/null 2>&1; then
-      sudo systemctl "$action"
-    else
-      echo "sudo authentication required to ${action}."
-      sudo systemctl "$action" || {
-        echo "Unable to ${action}."
-        return 1
-      }
-    fi
-    return 0
-  fi
-
-  if [ "$(id -u)" -eq 0 ]; then
-    systemctl "$action"
-    return 0
-  fi
-
-  echo "Unable to ${action}: sudo not available."
-  return 1
-}
-
-show_menu() {
-  echo
-  echo "WriterDeck menu:"
-  echo "  w) Reopen editor"
-  echo "  s) Drop to shell"
-  echo "  r) Reboot"
-  echo "  p) Poweroff"
-  printf "Choose action [w/s/r/p]: "
-}
-
 while true; do
-  if ! wd open-latest; then
-    echo "warning: writer session ended with an error."
-  fi
-
-  while true; do
     if [ ! -t 0 ] || [ ! -t 1 ]; then
-      echo "non-interactive session detected; reopening editor."
-      sleep 1
-      break
+        # Non-interactive (e.g. SSH without TTY): skip menu, open editor directly.
+        wd open-latest || true
+        sleep 1
+        continue
     fi
-
-    show_menu
-    read -r choice || {
-      echo "input closed; reopening editor."
-      sleep 1
-      break
-    }
-
-    case "$choice" in
-      w|W)
-        break
-        ;;
-      s|S)
-        open_shell
-        ;;
-      r|R)
-        run_power_action reboot || true
-        ;;
-      p|P)
-        run_power_action poweroff || true
-        ;;
-      *)
-        echo "Invalid choice. Use: w, s, r, or p."
-        ;;
-    esac
-  done
+    wd-menu || sleep 1
 done
