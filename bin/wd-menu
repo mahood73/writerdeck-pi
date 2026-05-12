@@ -156,7 +156,7 @@ def handle_key(key: int, items: list[MenuItem], selected: int) -> tuple[int, str
 def _box_dims(title: str, items: list[MenuItem]) -> tuple[int, int]:
     """Return (height, width) for a menu box."""
     content_width = max(
-        len(f" {item.key.upper()} {item.label}{'  ' if item.submenu else ' '}")
+        len(f" {item.key.upper()}  {item.label}  ")
         for item in items
     )
     width = max(content_width, len(title) + 4) + 2
@@ -176,12 +176,13 @@ def draw_menu(stdscr, y: int, x: int, title: str, items: list[MenuItem], selecte
     win.addstr(0, 2, f" {title} ")
 
     for i, item in enumerate(items):
-        suffix = " ▶" if item.submenu else ""
-        text = f" {item.key.upper()} {item.label}{suffix}"
-        text = text.ljust(width - 2)
         attr = curses.A_REVERSE if i == selected else curses.A_NORMAL
+        key_str = f" {item.key.upper()} "
+        suffix = " >" if item.submenu else "  "
+        label_str = f" {item.label}{suffix}".ljust(width - 2 - len(key_str))
         try:
-            win.addstr(i + 1, 1, text, attr)
+            win.addstr(i + 1, 1, key_str, attr | curses.A_BOLD)
+            win.addstr(i + 1, 1 + len(key_str), label_str, attr)
         except curses.error:
             pass
 
