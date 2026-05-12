@@ -10,15 +10,15 @@ Boot the Pi and you're straight into WordGrinder. Quit and a small menu offers r
 
 ## What's included
 
-| Path | Purpose |
-|------|---------|
-| `bin/wd` | CLI for writing workflow and sync |
-| `bin/wd-session` | tty1 session supervisor (editor → menu loop) |
-| `config/config.toml` | Default config |
-| `deploy/` | Autologin, firewall, and sync-node templates |
-| `scripts/install-trixie-lite.sh` | Installer |
-| `scripts/uninstall-trixie-lite.sh` | Uninstaller |
-| `tests/test_wd.py` | CLI tests |
+| Path                               | Purpose                                      |
+| ---------------------------------- | -------------------------------------------- |
+| `bin/wd`                           | CLI for writing workflow and sync            |
+| `bin/wd-session`                   | tty1 session supervisor (editor → menu loop) |
+| `config/config.toml`               | Default config                               |
+| `deploy/`                          | Autologin, firewall, and sync-node templates |
+| `scripts/install-trixie-lite.sh`   | Installer                                    |
+| `scripts/uninstall-trixie-lite.sh` | Uninstaller                                  |
+| `tests/test_wd.py`                 | CLI tests                                    |
 
 ## Quick start
 
