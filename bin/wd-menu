@@ -99,6 +99,7 @@ class MenuItem:
     label: str
     action: str     # identifier returned when item is activated
     submenu: list["MenuItem"] | None = None
+    value: str | None = None  # shown right-aligned before the indicator
 
 
 EXPORT_MENU = [
@@ -155,10 +156,10 @@ def handle_key(key: int, items: list[MenuItem], selected: int) -> tuple[int, str
 
 def _box_dims(title: str, items: list[MenuItem]) -> tuple[int, int]:
     """Return (height, width) for a menu box."""
-    content_width = max(
-        len(f" {item.key.upper()}  {item.label}  ")
-        for item in items
-    )
+    def _item_width(item: MenuItem) -> int:
+        val = f" [{item.value}]" if item.value else ""
+        return len(f" {item.key.upper()}  {item.label}{val}  ")
+    content_width = max(_item_width(item) for item in items)
     width = max(content_width, len(title) + 4) + 2
     height = len(items) + 2
     return height, width
@@ -178,11 +179,13 @@ def draw_menu(stdscr, y: int, x: int, title: str, items: list[MenuItem], selecte
     for i, item in enumerate(items):
         attr = curses.A_REVERSE if i == selected else curses.A_NORMAL
         key_str = f" {item.key.upper()} "
-        suffix = " >" if item.submenu else "  "
-        label_str = f" {item.label}{suffix}".ljust(width - 2 - len(key_str))
+        indicator = " >" if item.submenu else "  "
+        val_str = f" [{item.value}]" if item.value else ""
+        label_width = width - 2 - len(key_str) - len(val_str) - len(indicator)
+        label_str = f" {item.label}".ljust(label_width)
         try:
             win.addstr(i + 1, 1, key_str, attr | curses.A_BOLD)
-            win.addstr(i + 1, 1 + len(key_str), label_str, attr)
+            win.addstr(i + 1, 1 + len(key_str), label_str + val_str + indicator, attr)
         except curses.error:
             pass
 
@@ -377,23 +380,21 @@ def handle_export(stdscr) -> None:
 
 
 def handle_settings(stdscr) -> None:
-    rows, cols = stdscr.getmaxyx()
-    height, width = _box_dims("Settings", SETTINGS_MENU)
-    y = (rows - height) // 2
-    x = (cols - width) // 2
-
     selected = 0
     while True:
+        rows, cols = stdscr.getmaxyx()
         cfg = load_config()
         blank = str(cfg.get("display", {}).get("blank_timeout", 600))
         kbd = os.environ.get("WD_XKB_LAYOUT", cfg.get("session", {}).get("keyboard_layout", "gb"))
 
-        # Annotate labels with current values
         annotated = [
-            MenuItem("b", f"Screen blank timeout  [{blank}s]", "settings_blank"),
-            MenuItem("k", f"Keyboard layout  [{kbd}]", "settings_kbd"),
+            MenuItem("b", "Screen blank timeout", "settings_blank", value=f"{blank}s"),
+            MenuItem("k", "Keyboard layout", "settings_kbd", value=kbd),
         ]
 
+        height, width = _box_dims("Settings", annotated)
+        y = (rows - height) // 2
+        x = (cols - width) // 2
         stdscr.erase()
         stdscr.noutrefresh()
         draw_menu(stdscr, y, x, "Settings", annotated, selected)
