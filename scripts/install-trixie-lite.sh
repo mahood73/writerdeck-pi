@@ -498,7 +498,11 @@ configure_config_blank_timeout() {
   config_path=$1
   seconds=$2
   if grep -q '^\[display\]' "$config_path" 2>/dev/null; then
-    sudo_if_needed sed -i "s/^blank_timeout *=.*/blank_timeout = $seconds/" "$config_path"
+    if grep -q '^blank_timeout *=' "$config_path" 2>/dev/null; then
+      sudo_if_needed sed -i "s/^blank_timeout *=.*/blank_timeout = $seconds/" "$config_path"
+    else
+      sudo_if_needed sed -i "/^\[display\]/a blank_timeout = $seconds" "$config_path"
+    fi
   else
     printf '\n[display]\nblank_timeout = %s\n' "$seconds" | sudo_if_needed tee -a "$config_path" >/dev/null
   fi
