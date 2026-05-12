@@ -668,18 +668,18 @@ install_config() {
   render_default_config "$rendered_default"
   
   if [ ! -f "$CONFIG_PATH" ]; then
-    sudo_if_needed install -m 0644 "$rendered_default" "$CONFIG_PATH"
+    sudo_if_needed install -m 0644 -o "$TARGET_USER" "$rendered_default" "$CONFIG_PATH"
     rm -f "$rendered_default"
     log "Installed default config at $CONFIG_PATH"
     return
   fi
-  
+
   if cmp -s "$DEFAULT_CONFIG_PATH" "$CONFIG_PATH" \
     || is_managed_sync_writerdeck_config "$CONFIG_PATH" \
     || is_managed_legacy_config "$CONFIG_PATH" \
     || is_managed_writing_sync_config "$CONFIG_PATH"; then
-    sudo_if_needed install -m 0644 "$CONFIG_PATH" "${CONFIG_PATH}.bak"
-    sudo_if_needed install -m 0644 "$rendered_default" "$CONFIG_PATH"
+    sudo_if_needed install -m 0644 -o "$TARGET_USER" "$CONFIG_PATH" "${CONFIG_PATH}.bak"
+    sudo_if_needed install -m 0644 -o "$TARGET_USER" "$rendered_default" "$CONFIG_PATH"
     rm -f "$rendered_default"
     log "Migrated default config path for user $TARGET_USER"
     log "Backup written to: ${CONFIG_PATH}.bak"
@@ -692,7 +692,7 @@ install_config() {
     return
   fi
   
-  sudo_if_needed install -m 0644 "$rendered_default" "${CONFIG_PATH}.dist"
+  sudo_if_needed install -m 0644 -o "$TARGET_USER" "$rendered_default" "${CONFIG_PATH}.dist"
   rm -f "$rendered_default"
   log "Kept existing config: $CONFIG_PATH"
   log "Wrote updated defaults to: ${CONFIG_PATH}.dist"
@@ -815,6 +815,8 @@ sudo_if_needed install -d -m 0755 "$STATE_DIR"
 backup_file_if_missing "$CONFIG_PATH" etc/writerdeck/config.toml
 setup_writing_folder
 install_config
+# Ensure TARGET_USER can edit the config (settings menu writes it directly).
+sudo_if_needed chown "$TARGET_USER" "$CONFIG_PATH"
 install_user_foot_config
 setup_console
 
