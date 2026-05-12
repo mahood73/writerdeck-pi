@@ -821,10 +821,12 @@ setup_console
 sudo_if_needed install -d -m 0755 /usr/local/bin
 sudo_if_needed install -d -m 0755 /usr/local/scripts
 backup_file_if_missing /usr/local/bin/wd usr/local/bin/wd
+backup_file_if_missing /usr/local/bin/wd-menu usr/local/bin/wd-menu
 backup_file_if_missing /usr/local/bin/wd-session usr/local/bin/wd-session
 backup_file_if_missing /usr/local/bin/wd-labwc-session usr/local/bin/wd-labwc-session
 backup_file_if_missing /usr/local/scripts/wd-export.lua usr/local/scripts/wd-export.lua
 sudo_if_needed install -m 0755 "$REPO_DIR/bin/wd" /usr/local/bin/wd
+sudo_if_needed install -m 0755 "$REPO_DIR/bin/wd-menu" /usr/local/bin/wd-menu
 sudo_if_needed install -m 0755 "$REPO_DIR/bin/wd-session" /usr/local/bin/wd-session
 sudo_if_needed install -m 0755 "$REPO_DIR/deploy/wd-labwc-session.sh" /usr/local/bin/wd-labwc-session
 sudo_if_needed install -m 0755 "$REPO_DIR/scripts/wd-export.lua" /usr/local/scripts/wd-export.lua
