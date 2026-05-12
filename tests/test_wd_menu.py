@@ -192,7 +192,9 @@ def test_write_config_adds_missing_section():
 
 
 def test_write_config_creates_file_if_absent():
-    tmp = Path(tempfile.mktemp(suffix=".toml"))
+    with tempfile.NamedTemporaryFile(suffix=".toml", delete=False) as f:
+        tmp = Path(f.name)
+    tmp.unlink()  # remove so write_config_value sees FileNotFoundError
     original_config = menu.CONFIG_PATH
     menu.CONFIG_PATH = tmp
     try:

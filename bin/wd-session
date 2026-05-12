@@ -9,5 +9,5 @@ while true; do
         sleep 1
         continue
     fi
-    wd-menu || true
+    wd-menu || sleep 1
 done

@@ -815,10 +815,11 @@ sudo_if_needed install -d -m 0755 "$STATE_DIR"
 backup_file_if_missing "$CONFIG_PATH" etc/writerdeck/config.toml
 setup_writing_folder
 install_config
-# Ensure TARGET_USER can edit the config (settings menu writes it directly).
-sudo_if_needed chown "$TARGET_USER" "$CONFIG_PATH"
 install_user_foot_config
 setup_console
+# Ensure TARGET_USER can edit the config (settings menu writes it directly).
+# Must run after all install steps that write to CONFIG_PATH.
+sudo_if_needed chown "$TARGET_USER" "$CONFIG_PATH"
 
 sudo_if_needed install -d -m 0755 /usr/local/bin
 sudo_if_needed install -d -m 0755 /usr/local/scripts
