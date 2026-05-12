@@ -17,6 +17,7 @@ parking lot for things worth revisiting after more use.
 - WordGrinder templates for common draft types (note, chapter, scene, short story, blog post). Templates may also solve the "what are you writing today?" session start problem — instead of a project picker, a short template menu. Boot goes to last document by default; "new" drops into a template picker that sets folder and filename pattern automatically.
 - Decide whether templates should be copied from known-good `.wg` files created by WordGrinder itself.
 - Scrivener ingest via RTF — design the import workflow once export behaviour is settled.
+- Scrivener continuous sync — investigate exporting one `.txt` file per WordGrinder document into a folder that Scrivener's "Sync with External Folder" feature watches. Would enable automatic pickup on project open without needing Import and Split. Likely an opt-in flow alongside the current manual export: `wd export` stays as-is; a future mode could export flat files on session exit and keep Scrivener always up to date. Depends on users setting up the sync folder once in Scrivener.
 
 ## Writing aids
 
