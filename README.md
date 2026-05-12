@@ -33,7 +33,12 @@ Boot the Pi and you're straight into WordGrinder. Quit and a small menu offers r
 wd open-latest           # Open the most recently modified draft
 wd new [folder]          # Start a new draft
 wd projects              # List project folders
+wd export                # Export latest draft to TXT (Scrivener-ready)
+wd export <path>         # Export a specific draft
+wd export --all          # Export all drafts
 ```
+
+**Export:** Drafts are exported to `exports/<filename>.txt` alongside the `.wg` file. The output uses `# Document Name` headings, allowing Scrivener's File → Import → Import and Split (select "at Markdown headings") to split it into individual Binder documents.
 
 Config is read from `/etc/writerdeck/config.toml` by default, or set `WD_CONFIG` to override.
 
