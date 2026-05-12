@@ -131,6 +131,153 @@ class WriterDeckCliTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip().splitlines(), ["alpha", "beta"])
 
+    def _create_fake_wordgrinder(self, docs):
+        """
+        Create a fake wordgrinder script that handles --lua export calls.
+        docs: list of (name, content) tuples, one per document.
+        Returns the bin directory Path — prepend to PATH when calling _run.
+        """
+        fake_bin = Path(self.tmp.name) / "wg-bin"
+        fake_bin.mkdir(exist_ok=True)
+        fake_wg = fake_bin / "wordgrinder"
+
+        # Build a Python fake that writes files and prints docname\tpath pairs
+        doc_lines = []
+        for i, (name, content) in enumerate(docs, 1):
+            idx = f"{i:03d}"
+            doc_lines.append(f"    pathlib.Path(tmpdir, '{idx}.txt').write_text({content!r}, encoding='utf-8')")
+            doc_lines.append(f"    print({name!r} + '\\t' + str(pathlib.Path(tmpdir, '{idx}.txt')))")
+
+        body = "\n".join(doc_lines) if doc_lines else "    pass"
+        lines = [
+            "#!/usr/bin/env python3",
+            "import sys, pathlib",
+            "if len(sys.argv) >= 2 and sys.argv[1] == '--lua':",
+            "    tmpdir = sys.argv[4]",
+            body,
+            "sys.exit(0)",
+            "",
+        ]
+        script = "\n".join(lines)
+        fake_wg.write_text(script, encoding="utf-8")
+        fake_wg.chmod(fake_wg.stat().st_mode | stat.S_IXUSR)
+        return fake_bin
+
+    def _run_export(self, fake_wg_bin, *args):
+        env = os.environ.copy()
+        env["WD_CONFIG"] = str(self.config_path)
+        env["PATH"] = str(fake_wg_bin) + os.pathsep + env.get("PATH", "")
+        return subprocess.run(
+            [sys.executable, str(WD_BIN), "export", *args],
+            env=env,
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+    def test_export_latest_creates_combined_txt(self):
+        # Create a .wg file in the writing root
+        draft_dir = self.root / "inbox"
+        draft_dir.mkdir(parents=True)
+        draft = draft_dir / "2026-05-11_1200_draft.wg"
+        draft.write_text("", encoding="utf-8")
+
+        fake_wg_bin = self._create_fake_wordgrinder([("My Draft", "Hello world.")])
+        result = self._run_export(fake_wg_bin)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        out_file = draft_dir / "exports" / "2026-05-11_1200_draft.txt"
+        self.assertTrue(out_file.exists())
+        content = out_file.read_text(encoding="utf-8")
+        self.assertIn("# My Draft", content)
+        self.assertIn("Hello world.", content)
+
+    def test_export_multi_doc_combined(self):
+        draft_dir = self.root / "longform"
+        draft_dir.mkdir(parents=True)
+        draft = draft_dir / "novel.wg"
+        draft.write_text("", encoding="utf-8")
+
+        fake_wg_bin = self._create_fake_wordgrinder([
+            ("Chapter One", "Text of chapter one."),
+            ("Chapter Two", "Text of chapter two."),
+        ])
+        result = self._run_export(fake_wg_bin, str(draft))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        out_file = draft_dir / "exports" / "novel.txt"
+        content = out_file.read_text(encoding="utf-8")
+        self.assertIn("# Chapter One", content)
+        self.assertIn("Text of chapter one.", content)
+        self.assertIn("# Chapter Two", content)
+        self.assertIn("Text of chapter two.", content)
+        # Chapters must appear in order
+        self.assertLess(content.index("# Chapter One"), content.index("# Chapter Two"))
+
+    def test_export_explicit_path(self):
+        draft_dir = self.root / "inbox"
+        draft_dir.mkdir(parents=True)
+        draft = draft_dir / "specific.wg"
+        draft.write_text("", encoding="utf-8")
+
+        fake_wg_bin = self._create_fake_wordgrinder([("Doc", "Content here.")])
+        result = self._run_export(fake_wg_bin, str(draft))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        out_file = draft_dir / "exports" / "specific.txt"
+        self.assertTrue(out_file.exists())
+
+    def test_export_all(self):
+        for name in ("alpha.wg", "beta.wg"):
+            d = self.root / "inbox"
+            d.mkdir(parents=True, exist_ok=True)
+            (d / name).write_text("", encoding="utf-8")
+
+        fake_wg_bin = self._create_fake_wordgrinder([("Doc", "Some text.")])
+        result = self._run_export(fake_wg_bin, "--all")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        exports = list((self.root / "inbox" / "exports").glob("*.txt"))
+        self.assertEqual(len(exports), 2)
+
+    def test_export_no_drafts_error(self):
+        fake_wg_bin = self._create_fake_wordgrinder([])
+        result = self._run_export(fake_wg_bin)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("no .wg files found", result.stderr)
+
+    def test_export_path_and_all_error(self):
+        draft_dir = self.root / "inbox"
+        draft_dir.mkdir(parents=True)
+        draft = draft_dir / "draft.wg"
+        draft.write_text("", encoding="utf-8")
+
+        fake_wg_bin = self._create_fake_wordgrinder([("Doc", "Text.")])
+        result = self._run_export(fake_wg_bin, str(draft), "--all")
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("mutually exclusive", result.stderr)
+
+    def test_export_prints_hint_on_default(self):
+        draft_dir = self.root / "inbox"
+        draft_dir.mkdir(parents=True)
+        draft = draft_dir / "2026-05-11_1200_draft.wg"
+        draft.write_text("", encoding="utf-8")
+
+        fake_wg_bin = self._create_fake_wordgrinder([("Doc", "Text.")])
+
+        # Default invocation: hint should appear
+        result = self._run_export(fake_wg_bin)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Tip:", result.stdout)
+
+        # Explicit path: no hint
+        result2 = self._run_export(fake_wg_bin, str(draft))
+        self.assertEqual(result2.returncode, 0, result2.stderr)
+        self.assertNotIn("Tip:", result2.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
