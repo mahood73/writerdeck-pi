@@ -8,8 +8,10 @@ import datetime as dt
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 try:
@@ -75,6 +77,57 @@ def _find_latest_draft(root: Path) -> Path | None:
         return None
 
     return max(files, key=lambda path: path.stat().st_mtime)
+
+
+def _wd_export_lua_path() -> Path:
+    path = Path(__file__).resolve().parent.parent / "scripts" / "wd-export.lua"
+    if not path.exists():
+        raise WriterDeckError(f"wd-export.lua not found: {path}")
+    return path
+
+
+def _find_all_drafts(root: Path) -> list[Path]:
+    if not root.exists():
+        return []
+    return sorted(path for path in root.rglob("*.wg") if path.is_file())
+
+
+def _export_wg(wg_path: Path) -> list[Path]:
+    lua_script = _wd_export_lua_path()
+    tmpdir = Path(tempfile.mkdtemp())
+    try:
+        result = subprocess.run(
+            ["wordgrinder", "--lua", str(lua_script), str(wg_path), str(tmpdir)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise WriterDeckError(
+                f"export failed for {wg_path}: {result.stderr.strip()}"
+            )
+        docs = []
+        for line in result.stdout.splitlines():
+            if "\t" not in line:
+                continue
+            docname, txtpath = line.split("\t", 1)
+            docs.append((docname, Path(txtpath)))
+
+        if not docs:
+            raise WriterDeckError(f"no documents exported from {wg_path}")
+
+        combined = []
+        for docname, txtpath in docs:
+            text = txtpath.read_text(encoding="utf-8").rstrip()
+            combined.append(f"# {docname}\n\n{text}")
+
+        exports_dir = wg_path.parent / "exports"
+        exports_dir.mkdir(exist_ok=True)
+        out_path = exports_dir / f"{wg_path.stem}.txt"
+        out_path.write_text("\n\n".join(combined) + "\n", encoding="utf-8")
+        return [out_path]
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def _create_new_draft(root: Path, project: str, slug: str | None = None) -> Path:
@@ -148,6 +201,45 @@ def cmd_projects(cfg: Config, _args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_export(cfg: Config, args: argparse.Namespace) -> int:
+    if args.path and args.all:
+        print("error: 'path' and '--all' are mutually exclusive", file=sys.stderr)
+        return 1
+
+    if args.all:
+        targets = _find_all_drafts(cfg.root)
+        if not targets:
+            print("error: no .wg files found under", cfg.root, file=sys.stderr)
+            return 1
+    elif args.path:
+        targets = [Path(args.path)]
+    else:
+        latest = _find_latest_draft(cfg.root)
+        if latest is None:
+            print("error: no .wg files found", file=sys.stderr)
+            return 1
+        targets = [latest]
+
+    default_invocation = not args.path and not args.all
+
+    for wg_path in targets:
+        print(f"Exporting: {wg_path}")
+        try:
+            output_paths = _export_wg(wg_path)
+        except WriterDeckError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        for out in output_paths:
+            print(f"  → {out}")
+
+    if default_invocation:
+        print(
+            "Tip: run 'wd export <path>' to export a specific file,"
+            " 'wd export --all' for everything."
+        )
+
+    return 0
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="WriterDeck CLI")
@@ -168,6 +260,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     projects = subparsers.add_parser("projects", help="List project folders")
     projects.set_defaults(func=cmd_projects)
+
+    export_cmd = subparsers.add_parser("export", help="Export drafts to TXT")
+    export_cmd.add_argument("path", nargs="?", help="Path to a .wg file (default: most recent)")
+    export_cmd.add_argument("--all", action="store_true", dest="all", help="Export all .wg files under the writing root")
+    export_cmd.set_defaults(func=cmd_export)
 
     return parser
 
