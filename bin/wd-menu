@@ -462,6 +462,10 @@ def run(stdscr) -> None:
     curses.curs_set(0)
     curses.use_default_colors()
 
+    cfg = load_config()
+    if cfg.get("session", {}).get("start_mode", "resume") == "resume":
+        run_editor(stdscr)
+
     while True:
         action = run_menu(stdscr, "WriterDeck", MAIN_MENU)
         if action == "write":

@@ -7,3 +7,6 @@ command = "wordgrinder"
 
 [display]
 blank_timeout = 600
+
+[session]
+start_mode = "resume"
