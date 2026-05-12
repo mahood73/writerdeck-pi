@@ -73,17 +73,17 @@ def test_right_arrow_activates_current_item():
 
 
 def test_escape_returns_back():
-    sel, action = menu.handle_key(27, _items(), 2)
+    _, action = menu.handle_key(27, _items(), 2)
     assert action == "back"
 
 
 def test_q_returns_back():
-    sel, action = menu.handle_key(ord("q"), _items(), 2)
+    _, action = menu.handle_key(ord("q"), _items(), 2)
     assert action == "back"
 
 
 def test_left_arrow_returns_back():
-    sel, action = menu.handle_key(curses.KEY_LEFT, _items(), 1)
+    _, action = menu.handle_key(curses.KEY_LEFT, _items(), 1)
     assert action == "back"
 
 
@@ -98,22 +98,22 @@ def test_letter_w_activates_write():
 
 
 def test_letter_uppercase_W_activates_write():
-    sel, action = menu.handle_key(ord("W"), _items(), 3)
+    _, action = menu.handle_key(ord("W"), _items(), 3)
     assert action == "write"
 
 
 def test_letter_s_activates_shell():
-    sel, action = menu.handle_key(ord("s"), _items(), 0)
+    _, action = menu.handle_key(ord("s"), _items(), 0)
     assert action == "shell"
 
 
 def test_letter_r_activates_reboot():
-    sel, action = menu.handle_key(ord("r"), _items(), 0)
+    _, action = menu.handle_key(ord("r"), _items(), 0)
     assert action == "reboot"
 
 
 def test_letter_p_activates_poweroff():
-    sel, action = menu.handle_key(ord("p"), _items(), 0)
+    _, action = menu.handle_key(ord("p"), _items(), 0)
     assert action == "poweroff"
 
 
@@ -136,12 +136,12 @@ def test_export_submenu_items():
 
 
 def test_export_letter_l_activates_latest():
-    sel, action = menu.handle_key(ord("l"), menu.EXPORT_MENU, 0)
+    _, action = menu.handle_key(ord("l"), menu.EXPORT_MENU, 0)
     assert action == "export_latest"
 
 
 def test_export_letter_a_activates_all():
-    sel, action = menu.handle_key(ord("a"), menu.EXPORT_MENU, 0)
+    _, action = menu.handle_key(ord("a"), menu.EXPORT_MENU, 0)
     assert action == "export_all"
 
 
