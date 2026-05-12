@@ -4,3 +4,6 @@ default_project = "inbox"
 
 [editor]
 command = "wordgrinder"
+
+[display]
+blank_timeout = 600

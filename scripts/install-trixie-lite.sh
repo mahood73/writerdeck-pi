@@ -494,6 +494,16 @@ configure_cmdline_video() {
   return 0
 }
 
+configure_config_blank_timeout() {
+  config_path=$1
+  seconds=$2
+  if grep -q '^\[display\]' "$config_path" 2>/dev/null; then
+    sudo_if_needed sed -i "s/^blank_timeout *=.*/blank_timeout = $seconds/" "$config_path"
+  else
+    printf '\n[display]\nblank_timeout = %s\n' "$seconds" | sudo_if_needed tee -a "$config_path" >/dev/null
+  fi
+}
+
 configure_cmdline_consoleblank() {
   cmdline_path=$1
   blank_seconds=$2
@@ -568,7 +578,7 @@ esac
 # -----------------------------------------------------------------------------
 
 install_required_packages() {
-  required_packages="wordgrinder-ncurses cage foot syncthing tailscale python3"
+  required_packages="wordgrinder-ncurses cage foot labwc wlopm swayidle syncthing tailscale python3"
   missing_packages=""
   
   for pkg in $required_packages; do
@@ -788,6 +798,8 @@ setup_console() {
         log "Set console blanking to $CONSOLE_BLANK_SECONDS seconds in $CMDLINE_TXT"
       fi
     fi
+    configure_config_blank_timeout "$CONFIG_PATH" "$CONSOLE_BLANK_SECONDS"
+    log "Set display blank_timeout to $CONSOLE_BLANK_SECONDS seconds in $CONFIG_PATH"
   fi
 }
 
@@ -806,9 +818,11 @@ sudo_if_needed install -d -m 0755 /usr/local/bin
 sudo_if_needed install -d -m 0755 /usr/local/scripts
 backup_file_if_missing /usr/local/bin/wd usr/local/bin/wd
 backup_file_if_missing /usr/local/bin/wd-session usr/local/bin/wd-session
+backup_file_if_missing /usr/local/bin/wd-labwc-session usr/local/bin/wd-labwc-session
 backup_file_if_missing /usr/local/scripts/wd-export.lua usr/local/scripts/wd-export.lua
 sudo_if_needed install -m 0755 "$REPO_DIR/bin/wd" /usr/local/bin/wd
 sudo_if_needed install -m 0755 "$REPO_DIR/bin/wd-session" /usr/local/bin/wd-session
+sudo_if_needed install -m 0755 "$REPO_DIR/deploy/wd-labwc-session.sh" /usr/local/bin/wd-labwc-session
 sudo_if_needed install -m 0755 "$REPO_DIR/scripts/wd-export.lua" /usr/local/scripts/wd-export.lua
 
 sudo_if_needed install -d -m 0755 /etc/systemd/system/getty@tty1.service.d
