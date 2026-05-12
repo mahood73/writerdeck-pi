@@ -1,0 +1,4 @@
+reviews:
+  pre_merge_checks:
+    docstring_check:
+      enabled: false
