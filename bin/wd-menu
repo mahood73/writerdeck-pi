@@ -185,7 +185,7 @@ def draw_menu(stdscr, y: int, x: int, title: str, items: list[MenuItem], selecte
         except curses.error:
             pass
 
-    win.refresh()
+    win.noutrefresh()
 
 
 # ---------------------------------------------------------------------------
@@ -341,9 +341,10 @@ def handle_export(stdscr) -> None:
 
     selected = 0
     while True:
-        stdscr.clear()
+        stdscr.erase()
+        stdscr.noutrefresh()
         draw_menu(stdscr, y, x, "Export", EXPORT_MENU, selected)
-        stdscr.refresh()
+        curses.doupdate()
         key = stdscr.getch()
         selected, action = handle_key(key, EXPORT_MENU, selected)
         if action is None:
@@ -392,9 +393,10 @@ def handle_settings(stdscr) -> None:
             MenuItem("k", f"Keyboard layout  [{kbd}]", "settings_kbd"),
         ]
 
-        stdscr.clear()
+        stdscr.erase()
+        stdscr.noutrefresh()
         draw_menu(stdscr, y, x, "Settings", annotated, selected)
-        stdscr.refresh()
+        curses.doupdate()
         key = stdscr.getch()
         selected, action = handle_key(key, annotated, selected)
         if action is None:
@@ -442,9 +444,10 @@ def run_menu(stdscr, title: str, items: list[MenuItem], allow_back: bool = False
         height, width = _box_dims(title, items)
         y = max(0, (rows - height) // 2)
         x = max(0, (cols - width) // 2)
-        stdscr.clear()
+        stdscr.erase()
+        stdscr.noutrefresh()
         draw_menu(stdscr, y, x, title, items, selected)
-        stdscr.refresh()
+        curses.doupdate()
         key = stdscr.getch()
         selected, action = handle_key(key, items, selected)
         if action == "back":
