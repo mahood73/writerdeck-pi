@@ -278,6 +278,12 @@ remove_plymouth_splash() {
     log "Removed Plymouth theme at $PLYMOUTH_THEME_DEST"
   fi
 
+  HOOK_DEST="/etc/initramfs-tools/hooks/writerdeck-plymouth"
+  if [ -f "$HOOK_DEST" ]; then
+    sudo_if_needed rm -f "$HOOK_DEST"
+    log "Removed initramfs hook at $HOOK_DEST"
+  fi
+
   if command -v plymouth-set-default-theme >/dev/null 2>&1; then
     sudo_if_needed plymouth-set-default-theme text
     log "Reset Plymouth theme to text"
@@ -316,6 +322,8 @@ restore_or_remove_console_files() {
       remove_config_key "$CONFIG_TXT" "hdmi_group"
       remove_config_key "$CONFIG_TXT" "hdmi_mode"
       remove_config_key "$CONFIG_TXT" "disable_splash"
+      remove_config_key "$CONFIG_TXT" "framebuffer_width"
+      remove_config_key "$CONFIG_TXT" "framebuffer_height"
       log "Removed WriterDeck display keys from $CONFIG_TXT"
     fi
   fi
