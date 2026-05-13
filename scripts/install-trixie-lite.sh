@@ -650,7 +650,7 @@ esac
 # -----------------------------------------------------------------------------
 
 install_required_packages() {
-  required_packages="wordgrinder-ncurses cage foot labwc wlopm swayidle syncthing tailscale python3 plymouth"
+  required_packages="wordgrinder-ncurses cage foot labwc wlopm swayidle syncthing tailscale python3 plymouth plymouth-label"
   missing_packages=""
   
   for pkg in $required_packages; do
