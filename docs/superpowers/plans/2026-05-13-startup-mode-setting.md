@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Create feature branch
+## Task 1: Create feature branch
 
 - [ ] **Step 1: Create and switch to feature branch**
 
@@ -22,7 +22,7 @@ Expected: `Switched to a new branch 'feat/startup-mode-setting'`
 
 ---
 
-### Task 2: Test and add `settings_startup` to `SETTINGS_MENU`
+## Task 2: Test and add `settings_startup` to `SETTINGS_MENU`
 
 **Files:**
 - Modify: `tests/test_wd_menu.py`
@@ -78,7 +78,7 @@ git commit -m "feat: add startup mode item to SETTINGS_MENU"
 
 ---
 
-### Task 3: Test and implement the toggle handler
+## Task 3: Test and implement the toggle handler
 
 **Files:**
 - Modify: `tests/test_wd_menu.py`
@@ -120,25 +120,15 @@ def test_startup_mode_toggles_menu_to_resume():
     assert 'start_mode = "menu"' not in result
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [ ] **Step 2: Run tests to verify they pass**
 
 ```bash
 uv run --with pytest pytest tests/test_wd_menu.py::test_startup_mode_toggles_resume_to_menu tests/test_wd_menu.py::test_startup_mode_toggles_menu_to_resume -v
 ```
 
-Expected: FAIL — `NameError: name '_toggle_start_mode' is not defined` (function not yet in module under test — the tests themselves are new, so they'll fail due to the helper not existing yet... actually the helper is defined in the test file, so they should run. They will pass immediately because `_toggle_start_mode` calls `write_config_value` directly. This is intentional — the tests verify the toggle logic and config write are correct before we wire them into `handle_settings`.)
+Expected: PASS — `_write_config` is defined in the test file and calls `write_config_value` directly, so these tests pass as soon as they're added. They confirm that `write_config_value` handles quoted TOML strings correctly for `start_mode`. If they fail, check that `write_config_value` receives `'"menu"'` (a Python string containing `"menu"` with double-quotes).
 
-> Note: These tests exercise the toggle logic directly. They will pass once added, confirming `write_config_value` handles quoted TOML strings correctly for `start_mode`. If they fail, check that `write_config_value` receives `'"menu"'` (a Python string containing `"menu"` with double-quotes).
-
-- [ ] **Step 3: Run tests to confirm they pass**
-
-```bash
-uv run --with pytest pytest tests/test_wd_menu.py::test_startup_mode_toggles_resume_to_menu tests/test_wd_menu.py::test_startup_mode_toggles_menu_to_resume -v
-```
-
-Expected: PASS
-
-- [ ] **Step 4: Implement the toggle handler and annotated menu item**
+- [ ] **Step 3: Implement the toggle handler and annotated menu item**
 
 In `bin/wd-menu`, update `handle_settings()`. Replace the existing function (around line 382) with:
 
@@ -187,7 +177,7 @@ def handle_settings(stdscr) -> None:
             write_config_value("session", "start_mode", f'"{new_mode}"')
 ```
 
-- [ ] **Step 5: Run the full test suite**
+- [ ] **Step 4: Run the full test suite**
 
 ```bash
 uv run --with pytest pytest tests/test_wd_menu.py -v
@@ -195,7 +185,7 @@ uv run --with pytest pytest tests/test_wd_menu.py -v
 
 Expected: All tests PASS
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add bin/wd-menu tests/test_wd_menu.py
@@ -204,7 +194,7 @@ git commit -m "feat: startup mode toggle in Settings menu (issue #5)"
 
 ---
 
-### Task 4: Push branch and open PR
+## Task 4: Push branch and open PR
 
 - [ ] **Step 1: Push the branch**
 

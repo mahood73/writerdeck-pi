@@ -253,6 +253,14 @@ def test_list_wg_files_missing_dir():
     assert files == []
 
 
+def test_next_start_mode_resume_to_menu():
+    assert menu.next_start_mode("resume") == "menu"
+
+
+def test_next_start_mode_menu_to_resume():
+    assert menu.next_start_mode("menu") == "resume"
+
+
 def test_startup_mode_toggles_resume_to_menu():
     toml = '[session]\nstart_mode = "resume"\n'
     result = _write_config(toml, "session", "start_mode", '"menu"')

@@ -380,6 +380,10 @@ def handle_export(stdscr) -> None:
         return
 
 
+def next_start_mode(current: str) -> str:
+    return "menu" if current == "resume" else "resume"
+
+
 def handle_settings(stdscr) -> None:
     selected = 0
     while True:
@@ -420,8 +424,7 @@ def handle_settings(stdscr) -> None:
                 write_config_value("session", "keyboard_layout", f'"{safe}"')
                 _flash_message(stdscr, "Takes effect on next boot.")
         elif action == "settings_startup":
-            new_mode = "menu" if start_mode == "resume" else "resume"
-            write_config_value("session", "start_mode", f'"{new_mode}"')
+            write_config_value("session", "start_mode", f'"{next_start_mode(start_mode)}"')
 
 
 def _restart_swayidle(blank_timeout: str) -> None:
