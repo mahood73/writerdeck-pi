@@ -251,3 +251,34 @@ def test_list_wg_files_empty_dir():
 def test_list_wg_files_missing_dir():
     files = menu.list_wg_files(Path("/nonexistent/path"))
     assert files == []
+
+
+def _toggle_start_mode(initial_toml: str, current_mode: str) -> str:
+    """Simulate what handle_settings does: flip start_mode and write it."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False, encoding="utf-8") as f:
+        f.write(initial_toml)
+        tmp = Path(f.name)
+    original_config = menu.CONFIG_PATH
+    menu.CONFIG_PATH = tmp
+    try:
+        new_mode = "menu" if current_mode == "resume" else "resume"
+        menu.write_config_value("session", "start_mode", f'"{new_mode}"')
+        result = tmp.read_text(encoding="utf-8")
+    finally:
+        menu.CONFIG_PATH = original_config
+        tmp.unlink(missing_ok=True)
+    return result
+
+
+def test_startup_mode_toggles_resume_to_menu():
+    toml = '[session]\nstart_mode = "resume"\n'
+    result = _toggle_start_mode(toml, "resume")
+    assert 'start_mode = "menu"' in result
+    assert 'start_mode = "resume"' not in result
+
+
+def test_startup_mode_toggles_menu_to_resume():
+    toml = '[session]\nstart_mode = "menu"\n'
+    result = _toggle_start_mode(toml, "menu")
+    assert 'start_mode = "resume"' in result
+    assert 'start_mode = "menu"' not in result
