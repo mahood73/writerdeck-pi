@@ -536,6 +536,29 @@ configure_cmdline_consoleblank() {
   return 0
 }
 
+configure_cmdline_remove_serial_console() {
+  cmdline_path=$1
+  current_cmdline=$(cat "$cmdline_path")
+  updated_cmdline=""
+
+  for arg in $current_cmdline; do
+    case "$arg" in
+      console=serial0,*|console=ttyAMA0,*|console=ttyS0,*) ;;
+      *) updated_cmdline="${updated_cmdline}${updated_cmdline:+ }$arg" ;;
+    esac
+  done
+
+  if [ "$updated_cmdline" = "$current_cmdline" ]; then
+    return 1
+  fi
+
+  rendered_cmdline=$(mktemp)
+  printf '%s\n' "$updated_cmdline" > "$rendered_cmdline"
+  sudo_if_needed install -m 0644 "$rendered_cmdline" "$cmdline_path"
+  rm -f "$rendered_cmdline"
+  return 0
+}
+
 configure_cmdline_splash() {
   cmdline_path=$1
   current_cmdline=$(cat "$cmdline_path")
@@ -602,6 +625,9 @@ install_plymouth_splash() {
 
   if [ -n "$LOCAL_CMDLINE_TXT" ]; then
     backup_file_if_missing "$LOCAL_CMDLINE_TXT" "${LOCAL_CMDLINE_TXT#/}"
+    if configure_cmdline_remove_serial_console "$LOCAL_CMDLINE_TXT"; then
+      log "Removed serial console from $LOCAL_CMDLINE_TXT"
+    fi
     if configure_cmdline_splash "$LOCAL_CMDLINE_TXT"; then
       log "Added quiet splash vt.global_cursor_default=0 to $LOCAL_CMDLINE_TXT"
     fi
