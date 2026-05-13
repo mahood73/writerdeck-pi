@@ -598,7 +598,8 @@ install_plymouth_splash() {
   fi
 
   sudo_if_needed plymouth-set-default-theme writerdeck
-  log "Building initramfs — this may take about a minute on Pi Zero 2W..."
+  log "Rebuilding initramfs to apply Plymouth theme — this takes a few minutes."
+  log "(Note: apt already rebuilt it once per installed kernel above; this final rebuild applies the theme.)"
   sudo_if_needed update-initramfs -u
   log "Plymouth splash screen configured."
 }
