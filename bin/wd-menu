@@ -387,10 +387,12 @@ def handle_settings(stdscr) -> None:
         cfg = load_config()
         blank = str(cfg.get("display", {}).get("blank_timeout", 600))
         kbd = os.environ.get("WD_XKB_LAYOUT", cfg.get("session", {}).get("keyboard_layout", "gb"))
+        start_mode = cfg.get("session", {}).get("start_mode", "resume")
 
         annotated = [
             MenuItem("b", "Screen blank timeout", "settings_blank", value=f"{blank}s"),
             MenuItem("k", "Keyboard layout", "settings_kbd", value=kbd),
+            MenuItem("s", "Startup mode", "settings_startup", value=start_mode),
         ]
 
         height, width = _box_dims("Settings", annotated)
@@ -417,6 +419,9 @@ def handle_settings(stdscr) -> None:
                 safe = val.replace("\\", "\\\\").replace('"', '\\"')
                 write_config_value("session", "keyboard_layout", f'"{safe}"')
                 _flash_message(stdscr, "Takes effect on next boot.")
+        elif action == "settings_startup":
+            new_mode = "menu" if start_mode == "resume" else "resume"
+            write_config_value("session", "start_mode", f'"{new_mode}"')
 
 
 def _restart_swayidle(blank_timeout: str) -> None:
