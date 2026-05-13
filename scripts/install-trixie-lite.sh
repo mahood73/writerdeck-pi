@@ -633,18 +633,23 @@ install_plymouth_splash() {
     fi
   fi
 
-  DRM_RENDERER="/usr/lib/aarch64-linux-gnu/plymouth/renderers/drm.so"
-  if [ -f "$DRM_RENDERER" ]; then
-    backup_file_if_missing "$DRM_RENDERER" "${DRM_RENDERER#/}"
-    sudo_if_needed rm -f "$DRM_RENDERER"
-    log "Removed Plymouth DRM renderer (forces framebuffer use during boot)"
-  fi
-
   sudo_if_needed plymouth-set-default-theme writerdeck
   PLYMOUTH_CONF=/etc/plymouth/plymouthd.conf
-  if [ -f "$PLYMOUTH_CONF" ] && ! grep -q "^DeviceTimeout=" "$PLYMOUTH_CONF"; then
-    sudo_if_needed sed -i "/^\[Daemon\]/a DeviceTimeout=0" "$PLYMOUTH_CONF"
-    log "Set DeviceTimeout=0 in $PLYMOUTH_CONF"
+  if [ -f "$PLYMOUTH_CONF" ]; then
+    if ! grep -q "^DeviceTimeout=" "$PLYMOUTH_CONF"; then
+      sudo_if_needed sed -i "/^\[Daemon\]/a DeviceTimeout=2" "$PLYMOUTH_CONF"
+      log "Set DeviceTimeout=2 in $PLYMOUTH_CONF"
+    fi
+    if ! grep -q "^ShowDelay=" "$PLYMOUTH_CONF"; then
+      sudo_if_needed sed -i "/^\[Daemon\]/a ShowDelay=0" "$PLYMOUTH_CONF"
+      log "Set ShowDelay=0 in $PLYMOUTH_CONF"
+    fi
+  fi
+
+  INITRAMFS_CONF=/etc/initramfs-tools/initramfs.conf
+  if [ -f "$INITRAMFS_CONF" ] && grep -q "^MODULES=dep" "$INITRAMFS_CONF"; then
+    sudo_if_needed sed -i "s/^MODULES=dep/MODULES=most/" "$INITRAMFS_CONF"
+    log "Set MODULES=most in $INITRAMFS_CONF (required for early Plymouth display)"
   fi
   log "Rebuilding initramfs to apply Plymouth theme — this takes a few minutes."
   log "(Note: apt already rebuilt it once per installed kernel above; this final rebuild applies the theme.)"

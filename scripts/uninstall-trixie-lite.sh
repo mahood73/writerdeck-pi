@@ -284,16 +284,16 @@ remove_plymouth_splash() {
     log "Removed initramfs hook at $HOOK_DEST"
   fi
 
-  DRM_RENDERER="/usr/lib/aarch64-linux-gnu/plymouth/renderers/drm.so"
-  DRM_RENDERER_BACKUP="usr/lib/aarch64-linux-gnu/plymouth/renderers/drm.so"
-  if restore_file_from_backup "$DRM_RENDERER" "$DRM_RENDERER_BACKUP"; then
-    log "Restored Plymouth DRM renderer"
-  fi
-
   PLYMOUTH_CONF=/etc/plymouth/plymouthd.conf
   if [ -f "$PLYMOUTH_CONF" ]; then
-    sudo_if_needed sed -i "/^DeviceTimeout=/d" "$PLYMOUTH_CONF"
-    log "Removed DeviceTimeout from $PLYMOUTH_CONF"
+    sudo_if_needed sed -i "/^DeviceTimeout=/d;/^ShowDelay=/d" "$PLYMOUTH_CONF"
+    log "Removed DeviceTimeout and ShowDelay from $PLYMOUTH_CONF"
+  fi
+
+  INITRAMFS_CONF=/etc/initramfs-tools/initramfs.conf
+  if [ -f "$INITRAMFS_CONF" ] && grep -q "^MODULES=most" "$INITRAMFS_CONF"; then
+    sudo_if_needed sed -i "s/^MODULES=most/MODULES=dep/" "$INITRAMFS_CONF"
+    log "Restored MODULES=dep in $INITRAMFS_CONF"
   fi
 
   if command -v plymouth-set-default-theme >/dev/null 2>&1; then
