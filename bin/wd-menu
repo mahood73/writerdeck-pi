@@ -111,6 +111,7 @@ EXPORT_MENU = [
 SETTINGS_MENU = [
     MenuItem("b", "Screen blank timeout", "settings_blank"),
     MenuItem("k", "Keyboard layout", "settings_kbd"),
+    MenuItem("s", "Startup mode", "settings_startup"),
 ]
 
 MAIN_MENU = [

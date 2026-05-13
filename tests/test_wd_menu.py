@@ -150,6 +150,7 @@ def test_settings_submenu_items():
     actions = [i.action for i in items]
     assert "settings_blank" in actions
     assert "settings_kbd" in actions
+    assert "settings_startup" in actions
 
 
 # ---------------------------------------------------------------------------
