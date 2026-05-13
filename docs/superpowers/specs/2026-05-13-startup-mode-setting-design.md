@@ -22,7 +22,7 @@ Valid values: `"resume"` (open last document) or `"menu"` (show launcher menu). 
 
 A third item is added to the Settings menu:
 
-```
+```text
  S  Startup mode          [resume] >
  B  Screen blank timeout    [600s]
  K  Keyboard layout           [gb]
