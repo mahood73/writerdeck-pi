@@ -1,0 +1,43 @@
+Plymouth.SetBackgroundTopColor(0, 0, 0);
+Plymouth.SetBackgroundBottomColor(0, 0, 0);
+
+screen_width = Window.GetWidth();
+screen_height = Window.GetHeight();
+
+wordmark_image = Image.Text("WriterDeck", 1, 1, 1, 1, "DejaVu Sans 48");
+wordmark_sprite = Sprite(wordmark_image);
+wordmark_sprite.SetX(Math.Int((screen_width - wordmark_image.GetWidth()) / 2));
+wordmark_sprite.SetY(Math.Int((screen_height / 2) - wordmark_image.GetHeight() - 50));
+wordmark_sprite.SetZ(1);
+
+num_dots = 10;
+ring_radius = 30;
+ring_center_x = screen_width / 2;
+ring_center_y = screen_height / 2 + 30;
+
+dot_image = Image.Text("●", 1, 1, 1, 1, "DejaVu Sans 10");
+dot_half_w = Math.Int(dot_image.GetWidth() / 2);
+dot_half_h = Math.Int(dot_image.GetHeight() / 2);
+
+for (i = 0; i < num_dots; i++) {
+    angle = (i * 2 * Math.Pi) / num_dots - (Math.Pi / 2);
+    dot_x = Math.Int(ring_center_x + Math.Cos(angle) * ring_radius) - dot_half_w;
+    dot_y = Math.Int(ring_center_y + Math.Sin(angle) * ring_radius) - dot_half_h;
+    dot_sprite[i] = Sprite(dot_image);
+    dot_sprite[i].SetX(dot_x);
+    dot_sprite[i].SetY(dot_y);
+    dot_sprite[i].SetZ(1);
+    dot_sprite[i].SetOpacity(0.2);
+}
+
+fun refresh() {
+    now = Plymouth.GetMilliseconds();
+    frame = Math.Int(now / 80) % num_dots;
+    for (i = 0; i < num_dots; i++) {
+        diff = (frame - i + num_dots) % num_dots;
+        opacity = 0.2 + 0.8 * (1.0 - diff / num_dots);
+        dot_sprite[i].SetOpacity(opacity);
+    }
+}
+
+Plymouth.SetRefreshFunction(refresh);
