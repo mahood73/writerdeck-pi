@@ -150,6 +150,7 @@ def test_settings_submenu_items():
     actions = [i.action for i in items]
     assert "settings_blank" in actions
     assert "settings_kbd" in actions
+    assert "settings_startup" in actions
 
 
 # ---------------------------------------------------------------------------
@@ -250,3 +251,25 @@ def test_list_wg_files_empty_dir():
 def test_list_wg_files_missing_dir():
     files = menu.list_wg_files(Path("/nonexistent/path"))
     assert files == []
+
+
+def test_next_start_mode_resume_to_menu():
+    assert menu.next_start_mode("resume") == "menu"
+
+
+def test_next_start_mode_menu_to_resume():
+    assert menu.next_start_mode("menu") == "resume"
+
+
+def test_startup_mode_toggles_resume_to_menu():
+    toml = '[session]\nstart_mode = "resume"\n'
+    result = _write_config(toml, "session", "start_mode", '"menu"')
+    assert 'start_mode = "menu"' in result
+    assert 'start_mode = "resume"' not in result
+
+
+def test_startup_mode_toggles_menu_to_resume():
+    toml = '[session]\nstart_mode = "menu"\n'
+    result = _write_config(toml, "session", "start_mode", '"resume"')
+    assert 'start_mode = "resume"' in result
+    assert 'start_mode = "menu"' not in result

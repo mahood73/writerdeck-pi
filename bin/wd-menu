@@ -111,6 +111,7 @@ EXPORT_MENU = [
 SETTINGS_MENU = [
     MenuItem("b", "Screen blank timeout", "settings_blank"),
     MenuItem("k", "Keyboard layout", "settings_kbd"),
+    MenuItem("s", "Startup mode", "settings_startup"),
 ]
 
 MAIN_MENU = [
@@ -379,6 +380,10 @@ def handle_export(stdscr) -> None:
         return
 
 
+def next_start_mode(current: str) -> str:
+    return "menu" if current == "resume" else "resume"
+
+
 def handle_settings(stdscr) -> None:
     selected = 0
     while True:
@@ -386,10 +391,12 @@ def handle_settings(stdscr) -> None:
         cfg = load_config()
         blank = str(cfg.get("display", {}).get("blank_timeout", 600))
         kbd = os.environ.get("WD_XKB_LAYOUT", cfg.get("session", {}).get("keyboard_layout", "gb"))
+        start_mode = cfg.get("session", {}).get("start_mode", "resume")
 
         annotated = [
             MenuItem("b", "Screen blank timeout", "settings_blank", value=f"{blank}s"),
             MenuItem("k", "Keyboard layout", "settings_kbd", value=kbd),
+            MenuItem("s", "Startup mode", "settings_startup", value=start_mode),
         ]
 
         height, width = _box_dims("Settings", annotated)
@@ -416,6 +423,8 @@ def handle_settings(stdscr) -> None:
                 safe = val.replace("\\", "\\\\").replace('"', '\\"')
                 write_config_value("session", "keyboard_layout", f'"{safe}"')
                 _flash_message(stdscr, "Takes effect on next boot.")
+        elif action == "settings_startup":
+            write_config_value("session", "start_mode", f'"{next_start_mode(start_mode)}"')
 
 
 def _restart_swayidle(blank_timeout: str) -> None:
