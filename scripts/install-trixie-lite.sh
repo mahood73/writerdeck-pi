@@ -641,6 +641,11 @@ install_plymouth_splash() {
   fi
 
   sudo_if_needed plymouth-set-default-theme writerdeck
+  PLYMOUTH_CONF=/etc/plymouth/plymouthd.conf
+  if [ -f "$PLYMOUTH_CONF" ] && ! grep -q "^DeviceTimeout=" "$PLYMOUTH_CONF"; then
+    sudo_if_needed sed -i "/^\[Daemon\]/a DeviceTimeout=0" "$PLYMOUTH_CONF"
+    log "Set DeviceTimeout=0 in $PLYMOUTH_CONF"
+  fi
   log "Rebuilding initramfs to apply Plymouth theme — this takes a few minutes."
   log "(Note: apt already rebuilt it once per installed kernel above; this final rebuild applies the theme.)"
   sudo_if_needed update-initramfs -u
