@@ -44,7 +44,7 @@ def test_settings_submenu_items():
 - [ ] **Step 2: Run test to verify it fails**
 
 ```bash
-python -m pytest tests/test_wd_menu.py::test_settings_submenu_items -v
+uv run --with pytest pytest tests/test_wd_menu.py::test_settings_submenu_items -v
 ```
 
 Expected: FAIL — `AssertionError: assert 'settings_startup' in [...]`
@@ -64,7 +64,7 @@ SETTINGS_MENU = [
 - [ ] **Step 4: Run test to verify it passes**
 
 ```bash
-python -m pytest tests/test_wd_menu.py::test_settings_submenu_items -v
+uv run --with pytest pytest tests/test_wd_menu.py::test_settings_submenu_items -v
 ```
 
 Expected: PASS
@@ -123,7 +123,7 @@ def test_startup_mode_toggles_menu_to_resume():
 - [ ] **Step 2: Run tests to verify they fail**
 
 ```bash
-python -m pytest tests/test_wd_menu.py::test_startup_mode_toggles_resume_to_menu tests/test_wd_menu.py::test_startup_mode_toggles_menu_to_resume -v
+uv run --with pytest pytest tests/test_wd_menu.py::test_startup_mode_toggles_resume_to_menu tests/test_wd_menu.py::test_startup_mode_toggles_menu_to_resume -v
 ```
 
 Expected: FAIL — `NameError: name '_toggle_start_mode' is not defined` (function not yet in module under test — the tests themselves are new, so they'll fail due to the helper not existing yet... actually the helper is defined in the test file, so they should run. They will pass immediately because `_toggle_start_mode` calls `write_config_value` directly. This is intentional — the tests verify the toggle logic and config write are correct before we wire them into `handle_settings`.)
@@ -133,7 +133,7 @@ Expected: FAIL — `NameError: name '_toggle_start_mode' is not defined` (functi
 - [ ] **Step 3: Run tests to confirm they pass**
 
 ```bash
-python -m pytest tests/test_wd_menu.py::test_startup_mode_toggles_resume_to_menu tests/test_wd_menu.py::test_startup_mode_toggles_menu_to_resume -v
+uv run --with pytest pytest tests/test_wd_menu.py::test_startup_mode_toggles_resume_to_menu tests/test_wd_menu.py::test_startup_mode_toggles_menu_to_resume -v
 ```
 
 Expected: PASS
@@ -190,7 +190,7 @@ def handle_settings(stdscr) -> None:
 - [ ] **Step 5: Run the full test suite**
 
 ```bash
-python -m pytest tests/test_wd_menu.py -v
+uv run --with pytest pytest tests/test_wd_menu.py -v
 ```
 
 Expected: All tests PASS
@@ -227,7 +227,7 @@ gh pr create \
 
 ## Test plan
 
-- [ ] Run `python -m pytest tests/test_wd_menu.py -v` — all tests pass
+- [ ] Run `uv run --with pytest pytest tests/test_wd_menu.py -v` — all tests pass
 - [ ] Pull branch on Pi, boot WriterDeck, open Settings — confirm Startup mode row appears with current value
 - [ ] Press `S` — confirm value toggles between `resume` and `menu`
 - [ ] Reboot — confirm new mode is respected on startup
