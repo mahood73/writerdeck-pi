@@ -290,6 +290,12 @@ remove_plymouth_splash() {
     log "Restored Plymouth DRM renderer"
   fi
 
+  PLYMOUTH_CONF=/etc/plymouth/plymouthd.conf
+  if [ -f "$PLYMOUTH_CONF" ]; then
+    sudo_if_needed sed -i "/^DeviceTimeout=/d" "$PLYMOUTH_CONF"
+    log "Removed DeviceTimeout from $PLYMOUTH_CONF"
+  fi
+
   if command -v plymouth-set-default-theme >/dev/null 2>&1; then
     sudo_if_needed plymouth-set-default-theme text
     log "Reset Plymouth theme to text"
