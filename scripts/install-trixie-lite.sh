@@ -633,6 +633,13 @@ install_plymouth_splash() {
     fi
   fi
 
+  DRM_RENDERER="/usr/lib/aarch64-linux-gnu/plymouth/renderers/drm.so"
+  if [ -f "$DRM_RENDERER" ]; then
+    backup_file_if_missing "$DRM_RENDERER" "${DRM_RENDERER#/}"
+    sudo_if_needed rm -f "$DRM_RENDERER"
+    log "Removed Plymouth DRM renderer (forces framebuffer use during boot)"
+  fi
+
   sudo_if_needed plymouth-set-default-theme writerdeck
   log "Rebuilding initramfs to apply Plymouth theme — this takes a few minutes."
   log "(Note: apt already rebuilt it once per installed kernel above; this final rebuild applies the theme.)"

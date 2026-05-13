@@ -284,6 +284,12 @@ remove_plymouth_splash() {
     log "Removed initramfs hook at $HOOK_DEST"
   fi
 
+  DRM_RENDERER="/usr/lib/aarch64-linux-gnu/plymouth/renderers/drm.so"
+  DRM_RENDERER_BACKUP="usr/lib/aarch64-linux-gnu/plymouth/renderers/drm.so"
+  if restore_file_from_backup "$DRM_RENDERER" "$DRM_RENDERER_BACKUP"; then
+    log "Restored Plymouth DRM renderer"
+  fi
+
   if command -v plymouth-set-default-theme >/dev/null 2>&1; then
     sudo_if_needed plymouth-set-default-theme text
     log "Reset Plymouth theme to text"
