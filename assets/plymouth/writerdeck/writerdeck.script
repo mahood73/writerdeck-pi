@@ -15,7 +15,7 @@ ring_radius = 30;
 ring_center_x = screen_width / 2;
 ring_center_y = screen_height / 2 + 30;
 
-dot_image = Image.Text("●", 1, 1, 1, 1, "DejaVu Sans 10");
+dot_image = Image.Text("●", 1, 1, 1, 1, "DejaVu Sans 16");
 dot_half_w = Math.Int(dot_image.GetWidth() / 2);
 dot_half_h = Math.Int(dot_image.GetHeight() / 2);
 
@@ -27,7 +27,7 @@ for (i = 0; i < num_dots; i++) {
     dot_sprite[i].SetX(dot_x);
     dot_sprite[i].SetY(dot_y);
     dot_sprite[i].SetZ(1);
-    dot_sprite[i].SetOpacity(0.2);
+    dot_sprite[i].SetOpacity(0.4);
 }
 
 fun refresh() {
@@ -35,7 +35,7 @@ fun refresh() {
     frame = Math.Int(now / 80) % num_dots;
     for (i = 0; i < num_dots; i++) {
         diff = (frame - i + num_dots) % num_dots;
-        opacity = 0.2 + 0.8 * (1.0 - diff / num_dots);
+        opacity = 0.4 + 0.6 * (1.0 - diff / num_dots);
         dot_sprite[i].SetOpacity(opacity);
     }
 }
