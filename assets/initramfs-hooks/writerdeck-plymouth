@@ -23,3 +23,7 @@ for plugin in script.so label-pango.so label-freetype.so; do
     copy_exec "${PLUGIN_DIR}/${plugin}"
   fi
 done
+
+# vc4 DRM doesn't finish initializing until ~12s into boot, long after Plymouth
+# starts. Remove the DRM renderer so Plymouth uses frame-buffer.so instead.
+rm -f "${DESTDIR}/usr/lib/aarch64-linux-gnu/plymouth/renderers/drm.so"

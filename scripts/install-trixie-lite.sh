@@ -584,10 +584,20 @@ install_plymouth_splash() {
   sudo_if_needed install -m 0644 "$PLYMOUTH_THEME_SRC/writerdeck.script" "$PLYMOUTH_THEME_DEST/writerdeck.script"
   log "Installed Plymouth theme at $PLYMOUTH_THEME_DEST"
 
+  HOOK_SRC="$REPO_DIR/assets/initramfs-hooks/writerdeck-plymouth"
+  HOOK_DEST="/etc/initramfs-tools/hooks/writerdeck-plymouth"
+  if [ -f "$HOOK_SRC" ]; then
+    sudo_if_needed install -m 0755 "$HOOK_SRC" "$HOOK_DEST"
+    log "Installed initramfs hook at $HOOK_DEST"
+  fi
+
   if [ -n "$LOCAL_CONFIG_TXT" ]; then
     backup_file_if_missing "$LOCAL_CONFIG_TXT" "${LOCAL_CONFIG_TXT#/}"
     set_config_key "$LOCAL_CONFIG_TXT" "disable_splash" "1"
     log "Set disable_splash=1 in $LOCAL_CONFIG_TXT"
+    set_config_key "$LOCAL_CONFIG_TXT" "framebuffer_width" "1024"
+    set_config_key "$LOCAL_CONFIG_TXT" "framebuffer_height" "600"
+    log "Set framebuffer_width=1024 framebuffer_height=600 in $LOCAL_CONFIG_TXT"
   fi
 
   if [ -n "$LOCAL_CMDLINE_TXT" ]; then
