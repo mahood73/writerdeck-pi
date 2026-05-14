@@ -1,0 +1,50 @@
+#!/bin/sh
+
+PREREQS="plymouth"
+
+prereqs() { echo "$PREREQS"; }
+
+case "$1" in
+  prereqs) prereqs; exit 0 ;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+
+PLUGIN_DIR=/usr/lib/aarch64-linux-gnu/plymouth
+THEME_DIR=/usr/share/plymouth/themes/writerdeck
+
+if [ -d "${THEME_DIR}" ]; then
+  mkdir -p "${DESTDIR}${THEME_DIR}"
+  cp -a "${THEME_DIR}/." "${DESTDIR}${THEME_DIR}/"
+fi
+
+for plugin in script.so label-pango.so label-freetype.so; do
+  if [ -f "${PLUGIN_DIR}/${plugin}" ]; then
+    copy_exec "${PLUGIN_DIR}/${plugin}"
+  fi
+done
+
+# The system Plymouth hook uses a gawk-specific RS regex to detect our theme
+# name from plymouthd.conf; it fails on mawk (used on Pi OS) and falls back to
+# "text", skipping renderer and font installation. Copy them explicitly.
+RENDERER_DIR="${PLUGIN_DIR}/renderers"
+for renderer in drm.so frame-buffer.so; do
+  if [ -f "${RENDERER_DIR}/${renderer}" ]; then
+    copy_exec "${RENDERER_DIR}/${renderer}"
+  fi
+done
+DEJAVU=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
+if [ -f "${DEJAVU}" ]; then
+  mkdir -p "${DESTDIR}/usr/share/fonts/truetype/dejavu"
+  cp "${DEJAVU}" "${DESTDIR}/usr/share/fonts/truetype/dejavu/"
+fi
+if [ -f /etc/fonts/fonts.conf ]; then
+  mkdir -p "${DESTDIR}/etc/fonts/conf.d"
+  cp /etc/fonts/fonts.conf "${DESTDIR}/etc/fonts/"
+fi
+if [ -f /etc/fonts/conf.d/60-latin.conf ]; then
+  cp -L /etc/fonts/conf.d/60-latin.conf "${DESTDIR}/etc/fonts/conf.d/"
+fi
+mkdir -p "${DESTDIR}/var/cache/fontconfig"
+mkdir -p "${DESTDIR}/usr/local/share/fonts"
+fc-cache -s -y "${DESTDIR}" > /dev/null 2>&1 || true

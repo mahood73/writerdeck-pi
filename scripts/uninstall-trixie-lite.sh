@@ -242,6 +242,74 @@ configure_cmdline_consoleblank() {
   return 0
 }
 
+configure_cmdline_remove_splash() {
+  cmdline_path=$1
+
+  if [ ! -f "$cmdline_path" ]; then
+    return 1
+  fi
+
+  current_cmdline=$(cat "$cmdline_path")
+  updated_cmdline=""
+
+  for arg in $current_cmdline; do
+    case "$arg" in
+      quiet|splash|vt.global_cursor_default=*) ;;
+      *) updated_cmdline="${updated_cmdline}${updated_cmdline:+ }$arg" ;;
+    esac
+  done
+
+  if [ "$updated_cmdline" = "$current_cmdline" ]; then
+    return 1
+  fi
+
+  rendered_cmdline=$(mktemp)
+  printf '%s\n' "$updated_cmdline" > "$rendered_cmdline"
+  sudo_if_needed install -m 0644 "$rendered_cmdline" "$cmdline_path"
+  rm -f "$rendered_cmdline"
+  return 0
+}
+
+remove_plymouth_splash() {
+  PLYMOUTH_THEME_DEST="/usr/share/plymouth/themes/writerdeck"
+
+  if [ -d "$PLYMOUTH_THEME_DEST" ]; then
+    sudo_if_needed rm -rf "$PLYMOUTH_THEME_DEST"
+    log "Removed Plymouth theme at $PLYMOUTH_THEME_DEST"
+  fi
+
+  HOOK_DEST="/etc/initramfs-tools/hooks/writerdeck-plymouth"
+  if [ -f "$HOOK_DEST" ]; then
+    sudo_if_needed rm -f "$HOOK_DEST"
+    log "Removed initramfs hook at $HOOK_DEST"
+  fi
+
+  PLYMOUTH_CONF=/etc/plymouth/plymouthd.conf
+  if [ -f "$PLYMOUTH_CONF" ]; then
+    sudo_if_needed sed -i "/^DeviceTimeout=/d;/^ShowDelay=/d" "$PLYMOUTH_CONF"
+    log "Removed DeviceTimeout and ShowDelay from $PLYMOUTH_CONF"
+  fi
+
+  INITRAMFS_CONF=/etc/initramfs-tools/initramfs.conf
+  if [ -f "$INITRAMFS_CONF" ] && grep -q "^MODULES=most" "$INITRAMFS_CONF"; then
+    sudo_if_needed sed -i "s/^MODULES=most/MODULES=dep/" "$INITRAMFS_CONF"
+    log "Restored MODULES=dep in $INITRAMFS_CONF"
+  fi
+
+  PLYMOUTH_RESET_CMD=""
+  if [ -x /usr/sbin/plymouth-set-default-theme ]; then
+    PLYMOUTH_RESET_CMD=/usr/sbin/plymouth-set-default-theme
+  elif command -v plymouth-set-default-theme >/dev/null 2>&1; then
+    PLYMOUTH_RESET_CMD=$(command -v plymouth-set-default-theme)
+  fi
+  if [ -n "$PLYMOUTH_RESET_CMD" ]; then
+    sudo_if_needed "$PLYMOUTH_RESET_CMD" text
+    log "Reset Plymouth theme to text"
+    log "Rebuilding initramfs — this may take about a minute on Pi Zero 2W..."
+    sudo_if_needed update-initramfs -u
+  fi
+}
+
 restore_or_remove_console_files() {
   if restore_file_from_backup /etc/default/console-setup etc/default/console-setup; then
     log "Restored /etc/default/console-setup from backup"
@@ -271,6 +339,9 @@ restore_or_remove_console_files() {
       remove_config_key "$CONFIG_TXT" "display_rotate"
       remove_config_key "$CONFIG_TXT" "hdmi_group"
       remove_config_key "$CONFIG_TXT" "hdmi_mode"
+      remove_config_key "$CONFIG_TXT" "disable_splash"
+      remove_config_key "$CONFIG_TXT" "framebuffer_width"
+      remove_config_key "$CONFIG_TXT" "framebuffer_height"
       log "Removed WriterDeck display keys from $CONFIG_TXT"
     fi
   fi
@@ -281,6 +352,7 @@ restore_or_remove_console_files() {
     else
       configure_cmdline_video "$CMDLINE_TXT" "" || true
       configure_cmdline_consoleblank "$CMDLINE_TXT" "" || true
+      configure_cmdline_remove_splash "$CMDLINE_TXT" || true
       log "Removed WriterDeck kernel cmdline overrides from $CMDLINE_TXT"
     fi
   fi
@@ -319,10 +391,21 @@ if [ -n "$TARGET_USER" ] && { [ -f /lib/systemd/system/syncthing@.service ] || [
 fi
 
 restore_or_remove_console_files
-restore_or_remove_file /etc/systemd/system/getty@tty1.service.d/override.conf etc/systemd/system/getty@tty1.service.d/override.conf
-restore_or_remove_file /etc/profile.d/wd-session.sh etc/profile.d/wd-session.sh
-restore_or_remove_file /usr/local/bin/wd usr/local/bin/wd
-restore_or_remove_file /usr/local/bin/wd-session usr/local/bin/wd-session
+remove_plymouth_splash
+remove_file_if_present /etc/systemd/system/getty@tty1.service.d/override.conf
+log "Removed /etc/systemd/system/getty@tty1.service.d/override.conf"
+remove_file_if_present /etc/profile.d/wd-session.sh
+log "Removed /etc/profile.d/wd-session.sh"
+remove_file_if_present /usr/local/bin/wd
+log "Removed /usr/local/bin/wd"
+remove_file_if_present /usr/local/bin/wd-session
+log "Removed /usr/local/bin/wd-session"
+remove_file_if_present /usr/local/bin/wd-menu
+log "Removed /usr/local/bin/wd-menu"
+remove_file_if_present /usr/local/bin/wd-labwc-session
+log "Removed /usr/local/bin/wd-labwc-session"
+remove_file_if_present /usr/local/scripts/wd-export.lua
+log "Removed /usr/local/scripts/wd-export.lua"
 
 if restore_file_from_backup "$CONFIG_PATH" etc/writerdeck/config.toml; then
   log "Restored $CONFIG_PATH from backup"

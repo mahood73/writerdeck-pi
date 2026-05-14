@@ -536,6 +536,127 @@ configure_cmdline_consoleblank() {
   return 0
 }
 
+configure_cmdline_remove_serial_console() {
+  cmdline_path=$1
+  current_cmdline=$(cat "$cmdline_path")
+  updated_cmdline=""
+
+  for arg in $current_cmdline; do
+    case "$arg" in
+      console=serial0,*|console=ttyAMA0,*|console=ttyS0,*) ;;
+      *) updated_cmdline="${updated_cmdline}${updated_cmdline:+ }$arg" ;;
+    esac
+  done
+
+  if [ "$updated_cmdline" = "$current_cmdline" ]; then
+    return 1
+  fi
+
+  rendered_cmdline=$(mktemp)
+  printf '%s\n' "$updated_cmdline" > "$rendered_cmdline"
+  sudo_if_needed install -m 0644 "$rendered_cmdline" "$cmdline_path"
+  rm -f "$rendered_cmdline"
+  return 0
+}
+
+configure_cmdline_splash() {
+  cmdline_path=$1
+  current_cmdline=$(cat "$cmdline_path")
+  updated_cmdline=""
+
+  for arg in $current_cmdline; do
+    case "$arg" in
+      quiet|splash|vt.global_cursor_default=*) ;;
+      *) updated_cmdline="${updated_cmdline}${updated_cmdline:+ }$arg" ;;
+    esac
+  done
+
+  updated_cmdline="${updated_cmdline}${updated_cmdline:+ }quiet splash vt.global_cursor_default=0"
+
+  if [ "$updated_cmdline" = "$current_cmdline" ]; then
+    return 1
+  fi
+
+  rendered_cmdline=$(mktemp)
+  printf '%s\n' "$updated_cmdline" > "$rendered_cmdline"
+  sudo_if_needed install -m 0644 "$rendered_cmdline" "$cmdline_path"
+  rm -f "$rendered_cmdline"
+  return 0
+}
+
+install_plymouth_splash() {
+  PLYMOUTH_THEME_SRC="$REPO_DIR/assets/plymouth/writerdeck"
+  PLYMOUTH_THEME_DEST="/usr/share/plymouth/themes/writerdeck"
+
+  LOCAL_CONFIG_TXT=""
+  if [ -f /boot/firmware/config.txt ]; then
+    LOCAL_CONFIG_TXT=/boot/firmware/config.txt
+  elif [ -f /boot/config.txt ]; then
+    LOCAL_CONFIG_TXT=/boot/config.txt
+  fi
+
+  LOCAL_CMDLINE_TXT=""
+  if [ -f /boot/firmware/cmdline.txt ]; then
+    LOCAL_CMDLINE_TXT=/boot/firmware/cmdline.txt
+  elif [ -f /boot/cmdline.txt ]; then
+    LOCAL_CMDLINE_TXT=/boot/cmdline.txt
+  fi
+
+  sudo_if_needed install -d -m 0755 "$PLYMOUTH_THEME_DEST"
+  sudo_if_needed install -m 0644 "$PLYMOUTH_THEME_SRC/writerdeck.plymouth" "$PLYMOUTH_THEME_DEST/writerdeck.plymouth"
+  sudo_if_needed install -m 0644 "$PLYMOUTH_THEME_SRC/writerdeck.script" "$PLYMOUTH_THEME_DEST/writerdeck.script"
+  log "Installed Plymouth theme at $PLYMOUTH_THEME_DEST"
+
+  HOOK_SRC="$REPO_DIR/assets/initramfs-hooks/writerdeck-plymouth"
+  HOOK_DEST="/etc/initramfs-tools/hooks/writerdeck-plymouth"
+  if [ -f "$HOOK_SRC" ]; then
+    sudo_if_needed install -m 0755 "$HOOK_SRC" "$HOOK_DEST"
+    log "Installed initramfs hook at $HOOK_DEST"
+  fi
+
+  if [ -n "$LOCAL_CONFIG_TXT" ]; then
+    backup_file_if_missing "$LOCAL_CONFIG_TXT" "${LOCAL_CONFIG_TXT#/}"
+    set_config_key "$LOCAL_CONFIG_TXT" "disable_splash" "1"
+    log "Set disable_splash=1 in $LOCAL_CONFIG_TXT"
+    set_config_key "$LOCAL_CONFIG_TXT" "framebuffer_width" "1024"
+    set_config_key "$LOCAL_CONFIG_TXT" "framebuffer_height" "600"
+    log "Set framebuffer_width=1024 framebuffer_height=600 in $LOCAL_CONFIG_TXT"
+  fi
+
+  if [ -n "$LOCAL_CMDLINE_TXT" ]; then
+    backup_file_if_missing "$LOCAL_CMDLINE_TXT" "${LOCAL_CMDLINE_TXT#/}"
+    if configure_cmdline_remove_serial_console "$LOCAL_CMDLINE_TXT"; then
+      log "Removed serial console from $LOCAL_CMDLINE_TXT"
+    fi
+    if configure_cmdline_splash "$LOCAL_CMDLINE_TXT"; then
+      log "Added quiet splash vt.global_cursor_default=0 to $LOCAL_CMDLINE_TXT"
+    fi
+  fi
+
+  sudo_if_needed /usr/sbin/plymouth-set-default-theme writerdeck
+  PLYMOUTH_CONF=/etc/plymouth/plymouthd.conf
+  if [ -f "$PLYMOUTH_CONF" ]; then
+    if ! grep -q "^DeviceTimeout=" "$PLYMOUTH_CONF"; then
+      sudo_if_needed sed -i "/^\[Daemon\]/a DeviceTimeout=2" "$PLYMOUTH_CONF"
+      log "Set DeviceTimeout=2 in $PLYMOUTH_CONF"
+    fi
+    if ! grep -q "^ShowDelay=" "$PLYMOUTH_CONF"; then
+      sudo_if_needed sed -i "/^\[Daemon\]/a ShowDelay=0" "$PLYMOUTH_CONF"
+      log "Set ShowDelay=0 in $PLYMOUTH_CONF"
+    fi
+  fi
+
+  INITRAMFS_CONF=/etc/initramfs-tools/initramfs.conf
+  if [ -f "$INITRAMFS_CONF" ] && grep -q "^MODULES=dep" "$INITRAMFS_CONF"; then
+    sudo_if_needed sed -i "s/^MODULES=dep/MODULES=most/" "$INITRAMFS_CONF"
+    log "Set MODULES=most in $INITRAMFS_CONF (required for early Plymouth display)"
+  fi
+  log "Rebuilding initramfs to apply Plymouth theme — this takes a few minutes."
+  log "(Note: apt already rebuilt it once per installed kernel above; this final rebuild applies the theme.)"
+  sudo_if_needed update-initramfs -u
+  log "Plymouth splash screen configured."
+}
+
 # -----------------------------------------------------------------------------
 # Main flow
 # -----------------------------------------------------------------------------
@@ -582,7 +703,7 @@ esac
 # -----------------------------------------------------------------------------
 
 install_required_packages() {
-  required_packages="wordgrinder-ncurses cage foot labwc wlopm swayidle syncthing tailscale python3"
+  required_packages="wordgrinder-ncurses cage foot labwc wlopm swayidle syncthing tailscale python3 plymouth plymouth-label"
   missing_packages=""
   
   for pkg in $required_packages; do
@@ -817,6 +938,7 @@ setup_writing_folder
 install_config
 install_user_foot_config
 setup_console
+install_plymouth_splash
 # Ensure TARGET_USER can edit the config (settings menu writes it directly).
 # Must run after all install steps that write to CONFIG_PATH.
 sudo_if_needed chown "$TARGET_USER" "$CONFIG_PATH"

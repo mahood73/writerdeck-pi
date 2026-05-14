@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=WriterDeck
+Description=WriterDeck boot splash
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/writerdeck
+ScriptFile=/usr/share/plymouth/themes/writerdeck/writerdeck.script
