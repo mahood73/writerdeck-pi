@@ -386,10 +386,14 @@ fi
 
 restore_or_remove_console_files
 remove_plymouth_splash
-restore_or_remove_file /etc/systemd/system/getty@tty1.service.d/override.conf etc/systemd/system/getty@tty1.service.d/override.conf
-restore_or_remove_file /etc/profile.d/wd-session.sh etc/profile.d/wd-session.sh
-restore_or_remove_file /usr/local/bin/wd usr/local/bin/wd
-restore_or_remove_file /usr/local/bin/wd-session usr/local/bin/wd-session
+remove_file_if_present /etc/systemd/system/getty@tty1.service.d/override.conf
+log "Removed /etc/systemd/system/getty@tty1.service.d/override.conf"
+remove_file_if_present /etc/profile.d/wd-session.sh
+log "Removed /etc/profile.d/wd-session.sh"
+remove_file_if_present /usr/local/bin/wd
+log "Removed /usr/local/bin/wd"
+remove_file_if_present /usr/local/bin/wd-session
+log "Removed /usr/local/bin/wd-session"
 
 if restore_file_from_backup "$CONFIG_PATH" etc/writerdeck/config.toml; then
   log "Restored $CONFIG_PATH from backup"
