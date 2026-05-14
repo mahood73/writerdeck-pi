@@ -98,13 +98,17 @@ for (i = 0; i < num_dots; i++) {
     dot_sprite[i].SetOpacity(0.2);
 }
 
+dots.tick = 0;
+
 fun refresh() {
-    now = Plymouth.GetMilliseconds();
-    frame = Math.Int(now / 80) % num_dots;
+    dots.tick = dots.tick + 1;
+    frame = Math.Int(dots.tick / 5) % num_dots;
     for (i = 0; i < num_dots; i++) {
         diff = (frame - i + num_dots) % num_dots;
-        opacity = 0.2 + 0.8 * (1.0 - diff / num_dots);
-        dot_sprite[i].SetOpacity(opacity);
+        if (diff == 0) { dot_sprite[i].SetOpacity(1.0); }
+        else if (diff == 1) { dot_sprite[i].SetOpacity(0.5); }
+        else if (diff == 2) { dot_sprite[i].SetOpacity(0.2); }
+        else { dot_sprite[i].SetOpacity(0.0); }
     }
 }
 
@@ -116,7 +120,7 @@ Plymouth.SetRefreshFunction(refresh);
 - `Image.Text(text, r, g, b, alpha, font)` — renders text at given colour/font; font string is Pango notation (e.g. `"DejaVu Sans 48"`)
 - Wordmark is centred horizontally, positioned 50px above vertical centre
 - 10 dots are arranged in a ring using `Math.Cos`/`Math.Sin`, starting at 12 o'clock (`- Math.Pi / 2`)
-- `refresh()` fires every frame; `Plymouth.GetMilliseconds() / 80` gives the current "active" dot index; opacity fades from 1.0 (active) to 0.2 (trailing) around the ring
+- `refresh()` fires every frame; `dots.tick` (an object property, incremented each call) drives animation — `Plymouth.GetMilliseconds()` is not used as it returns NaN in the initramfs context; opacity gradient: lead dot 1.0, trail 0.5, tail 0.2, rest 0.0
 
 - [ ] **Step 3: Commit**
 
