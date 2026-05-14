@@ -296,7 +296,7 @@ remove_plymouth_splash() {
     log "Restored MODULES=dep in $INITRAMFS_CONF"
   fi
 
-  if command -v plymouth-set-default-theme >/dev/null 2>&1; then
+  if [ -x /usr/sbin/plymouth-set-default-theme ] || command -v plymouth-set-default-theme >/dev/null 2>&1; then
     sudo_if_needed plymouth-set-default-theme text
     log "Reset Plymouth theme to text"
     log "Rebuilding initramfs — this may take about a minute on Pi Zero 2W..."
