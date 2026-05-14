@@ -26,8 +26,13 @@ done
 
 # The system Plymouth hook uses a gawk-specific RS regex to detect our theme
 # name from plymouthd.conf; it fails on mawk (used on Pi OS) and falls back to
-# "text", skipping font installation. Copy fonts explicitly so Image.Text()
-# works in the initramfs regardless.
+# "text", skipping renderer and font installation. Copy them explicitly.
+RENDERER_DIR="${PLUGIN_DIR}/renderers"
+for renderer in drm.so frame-buffer.so; do
+  if [ -f "${RENDERER_DIR}/${renderer}" ]; then
+    copy_exec "${RENDERER_DIR}/${renderer}"
+  fi
+done
 DEJAVU=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
 if [ -f "${DEJAVU}" ]; then
   mkdir -p "${DESTDIR}/usr/share/fonts/truetype/dejavu"
