@@ -28,3 +28,23 @@ done
 # crashing Plymouth on a 512MB Pi Zero 2W. Remove it so Plymouth uses
 # frame-buffer.so instead, which maps /dev/fb0 directly (~2.4MB).
 rm -f "${DESTDIR}/usr/lib/aarch64-linux-gnu/plymouth/renderers/drm.so"
+
+# The system Plymouth hook uses a gawk-specific RS regex to detect our theme
+# name from plymouthd.conf; it fails on mawk (used on Pi OS) and falls back to
+# "text", skipping font installation. Copy fonts explicitly so Image.Text()
+# works in the initramfs regardless.
+DEJAVU=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
+if [ -f "${DEJAVU}" ]; then
+  mkdir -p "${DESTDIR}/usr/share/fonts/truetype/dejavu"
+  cp "${DEJAVU}" "${DESTDIR}/usr/share/fonts/truetype/dejavu/"
+fi
+if [ -f /etc/fonts/fonts.conf ]; then
+  mkdir -p "${DESTDIR}/etc/fonts/conf.d"
+  cp /etc/fonts/fonts.conf "${DESTDIR}/etc/fonts/"
+fi
+if [ -f /etc/fonts/conf.d/60-latin.conf ]; then
+  cp -L /etc/fonts/conf.d/60-latin.conf "${DESTDIR}/etc/fonts/conf.d/"
+fi
+mkdir -p "${DESTDIR}/var/cache/fontconfig"
+mkdir -p "${DESTDIR}/usr/local/share/fonts"
+fc-cache -s -y "${DESTDIR}" > /dev/null 2>&1 || true
