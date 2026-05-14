@@ -23,3 +23,8 @@ for plugin in script.so label-pango.so label-freetype.so; do
     copy_exec "${PLUGIN_DIR}/${plugin}"
   fi
 done
+
+# The DRM renderer maps the vc4 GPU's CMA region (~256MB) multiple times,
+# crashing Plymouth on a 512MB Pi Zero 2W. Remove it so Plymouth uses
+# frame-buffer.so instead, which maps /dev/fb0 directly (~2.4MB).
+rm -f "${DESTDIR}/usr/lib/aarch64-linux-gnu/plymouth/renderers/drm.so"
