@@ -633,7 +633,7 @@ install_plymouth_splash() {
     fi
   fi
 
-  sudo_if_needed plymouth-set-default-theme writerdeck
+  sudo_if_needed /usr/sbin/plymouth-set-default-theme writerdeck
   PLYMOUTH_CONF=/etc/plymouth/plymouthd.conf
   if [ -f "$PLYMOUTH_CONF" ]; then
     if ! grep -q "^DeviceTimeout=" "$PLYMOUTH_CONF"; then
