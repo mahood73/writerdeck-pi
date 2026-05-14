@@ -296,8 +296,14 @@ remove_plymouth_splash() {
     log "Restored MODULES=dep in $INITRAMFS_CONF"
   fi
 
-  if [ -x /usr/sbin/plymouth-set-default-theme ] || command -v plymouth-set-default-theme >/dev/null 2>&1; then
-    sudo_if_needed plymouth-set-default-theme text
+  PLYMOUTH_RESET_CMD=""
+  if [ -x /usr/sbin/plymouth-set-default-theme ]; then
+    PLYMOUTH_RESET_CMD=/usr/sbin/plymouth-set-default-theme
+  elif command -v plymouth-set-default-theme >/dev/null 2>&1; then
+    PLYMOUTH_RESET_CMD=$(command -v plymouth-set-default-theme)
+  fi
+  if [ -n "$PLYMOUTH_RESET_CMD" ]; then
+    sudo_if_needed "$PLYMOUTH_RESET_CMD" text
     log "Reset Plymouth theme to text"
     log "Rebuilding initramfs — this may take about a minute on Pi Zero 2W..."
     sudo_if_needed update-initramfs -u
@@ -394,6 +400,12 @@ remove_file_if_present /usr/local/bin/wd
 log "Removed /usr/local/bin/wd"
 remove_file_if_present /usr/local/bin/wd-session
 log "Removed /usr/local/bin/wd-session"
+remove_file_if_present /usr/local/bin/wd-menu
+log "Removed /usr/local/bin/wd-menu"
+remove_file_if_present /usr/local/bin/wd-labwc-session
+log "Removed /usr/local/bin/wd-labwc-session"
+remove_file_if_present /usr/local/scripts/wd-export.lua
+log "Removed /usr/local/scripts/wd-export.lua"
 
 if restore_file_from_backup "$CONFIG_PATH" etc/writerdeck/config.toml; then
   log "Restored $CONFIG_PATH from backup"

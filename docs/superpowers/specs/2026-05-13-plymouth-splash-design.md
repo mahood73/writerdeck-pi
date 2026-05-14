@@ -14,7 +14,7 @@ Custom Plymouth `script` theme — code-generated visuals, no image assets. Plym
 
 **Wordmark:** "WriterDeck" in DejaVu Sans ~48pt, white, horizontally and vertically centred (slightly above centre to leave room for the spinner). DejaVu Sans is already installed as a dependency of `foot`.
 
-**Spinner:** A ring of 10 dots arranged in a circle via `Math.Sin()` / `Math.Cos()`, each dot a small filled circle sprite. Dots cycle brightness in a chasing sequence driven by `Plymouth.GetMilliseconds()`, producing a smooth rotating animation. No image files — pure Plymouth script.
+**Spinner:** A ring of 10 dots arranged in a circle via `Math.Sin()` / `Math.Cos()`, each dot a small filled circle sprite. Dots cycle brightness in a chasing sequence driven by an internal tick accumulator (`dots.tick`, incremented each refresh call), producing a smooth rotating animation. `Plymouth.GetMilliseconds()` is not used — it returns NaN in the initramfs context, silently breaking all opacity comparisons. No image files — pure Plymouth script.
 
 ## Files
 
