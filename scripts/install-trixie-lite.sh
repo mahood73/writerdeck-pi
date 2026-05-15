@@ -63,6 +63,7 @@ backup_file_if_missing() {
 # Interactive prompts - get user preferences
 # -----------------------------------------------------------------------------
 
+# MAP-FUNCTIONS-START
 # Map common resolutions to hdmi_mode values (DMT modes)
 get_hdmi_mode() {
   case "$1" in
@@ -90,6 +91,24 @@ hdmi_mode_to_resolution() {
     *)   echo "1280x720" ;;
   esac
 }
+# MAP-FUNCTIONS-END
+
+# LABEL-FUNCTION-START
+# Returns the resolution prompt header line based on detection source.
+# Args: $1 = configured_res (may be empty), $2 = detected_res (may be empty)
+resolution_prompt_label() {
+  _configured=$1
+  _detected=$2
+  if [ -n "$_configured" ]; then
+    echo "HDMI resolution (configured: mode ${_configured}):"
+  elif [ -n "$_detected" ]; then
+    _label=$(hdmi_mode_to_resolution "$_detected")
+    echo "HDMI resolution (detected from display: ${_label}, mode ${_detected}):"
+  else
+    echo "HDMI resolution (no display detected; suggested: mode 82):"
+  fi
+}
+# LABEL-FUNCTION-END
 
 probe_drm_resolution() {
   for status_file in /sys/class/drm/card*-HDMI-A-*/status; do
