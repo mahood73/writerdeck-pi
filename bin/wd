@@ -372,8 +372,7 @@ def build_parser() -> argparse.ArgumentParser:
     export_cmd.add_argument("--all", action="store_true", dest="export_all", help="Export all .wg files under the writing root")
     export_cmd.set_defaults(func=cmd_export)
 
-    verify_cmd = subparsers.add_parser("verify", help="Check WriterDeck install state")
-    verify_cmd.set_defaults(func=None)
+    subparsers.add_parser("verify", help="Check WriterDeck install state")
 
     return parser
 
