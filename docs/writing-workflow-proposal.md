@@ -5,15 +5,14 @@ small and should change as the real writing workflow becomes clearer.
 
 ## Current direction
 
-Use `~/Writing` as the top-level synced directory.
+Use `~/Writing` as the top-level writing directory.
 
 Rationale:
 
-- `~/Writing` is a dedicated writing sync root across the Pi, NAS, desktop,
-  and laptop.
-- It avoids nested Syncthing folders and selective-sync ignore rules.
-- Files remain easy to inspect and recover from any synced machine.
-- The deck does not need to know about unrelated personal sync data.
+- `~/Writing` is a dedicated place for drafts on the device.
+- Files remain easy to inspect, copy, back up, or recover.
+- The deck does not need to know about any storage or transfer tools the user
+  chooses outside WriterDeck.
 
 ## Editor model
 
@@ -84,7 +83,7 @@ WordGrinder's document group format appears to fit this well:
 
 - one `.wg` per novel or major longform project
 - internal documents for chapters, scenes, notes, or scraps
-- export to RTF/TXT for sync and later Scrivener ingest
+- export to RTF/TXT for later Scrivener ingest or plain-file recovery
 
 A future launcher can keep track of the current active longform project in a
 small config file rather than asking every time.
@@ -132,17 +131,12 @@ The launcher should avoid asking filing questions before the user can write.
 When uncertain, create an inbox draft with a timestamped name and let later
 desktop/Scrivener tooling tidy it.
 
-## Sync and safety
-
-Syncthing should sync `~/Writing`.
-
-Tailscale should provide reliable connectivity while away from the home LAN.
+## Safety
 
 Before real writing goes onto the deck, verify:
 
 - WordGrinder saves the `.wg` file where expected.
 - Export-on-exit creates `.rtf` and `.txt` files.
-- Syncthing carries all expected files to the home node.
 - Versioning or snapshots exist somewhere off-device.
 - Scrivener ingest/import can consume the exported RTF without surprising loss.
 

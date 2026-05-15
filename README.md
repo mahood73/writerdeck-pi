@@ -4,7 +4,7 @@
 
 A distraction-free writing appliance for Raspberry Pi Zero 2W running Debian 13 (Trixie) Lite.
 
-Boot the Pi and you're straight into WordGrinder. Quit and a small menu offers reopen, shell, reboot, or poweroff — nothing else. Writing syncs to a home node via Syncthing.
+Boot the Pi and you're straight into WordGrinder. Quit and a small menu offers writing, export, settings, shell, reboot, and poweroff actions.
 
 > **Personal project disclaimer:** This works on my desk, on my hardware, for my writing. It is shared in case it is useful, not as supported software. Back up your writing independently and don't trust this with anything you can't afford to lose.
 
@@ -12,10 +12,10 @@ Boot the Pi and you're straight into WordGrinder. Quit and a small menu offers r
 
 | Path                               | Purpose                                      |
 | ---------------------------------- | -------------------------------------------- |
-| `bin/wd`                           | CLI for writing workflow and sync            |
+| `bin/wd`                           | CLI for the writing workflow                 |
 | `bin/wd-session`                   | tty1 session supervisor (editor → menu loop) |
 | `config/config.toml`               | Default config                               |
-| `deploy/`                          | Autologin, firewall, and sync-node templates |
+| `deploy/`                          | Autologin, terminal, and firewall templates  |
 | `scripts/install-trixie-lite.sh`   | Installer                                    |
 | `scripts/uninstall-trixie-lite.sh` | Uninstaller                                  |
 | `tests/test_wd.py`                 | CLI tests                                    |
@@ -24,8 +24,7 @@ Boot the Pi and you're straight into WordGrinder. Quit and a small menu offers r
 
 1. Read [docs/setup-trixie-lite.md](docs/setup-trixie-lite.md).
 2. Run `sudo ./scripts/install-trixie-lite.sh` on the Pi.
-3. Configure Tailscale and pair a Syncthing folder with your home node.
-4. Reboot — `tty1` opens directly into WordGrinder.
+3. Reboot — `tty1` opens directly into WordGrinder.
 
 ## CLI
 
@@ -56,9 +55,25 @@ command = "wordgrinder"
 ## Session behaviour
 
 - `tty1` autologin runs `wd-session`, which opens the editor immediately.
-- Quitting the editor shows a menu: `w` reopen · `s` shell · `r` reboot · `p` poweroff.
+- Quitting the editor shows the WriterDeck menu: `w` write · `e` export · `,` settings · `s` shell · `r` reboot · `p` poweroff.
+- Settings currently includes screen blank timeout, keyboard layout, and startup mode.
 - `tty2+` is a normal login shell.
 
-## Sync
+## Tests
 
-WriterDeck writes locally. Point any sync tool (Syncthing, Dropbox, Nextcloud, etc.) at your writing folder and it will carry files to other devices. WriterDeck has no opinion about which tool you use.
+Run the full test suite with:
+
+```bash
+uv --cache-dir /private/tmp/uv-cache run --with pytest pytest -q
+```
+
+The `uv` command supplies pytest without adding a project dependency file. The
+explicit cache directory avoids permission issues on systems where `~/.cache/uv`
+is not writable by the current environment.
+
+If pytest is unavailable, this partial fallback runs only the `unittest`-based
+CLI tests:
+
+```bash
+python3 -m unittest tests.test_wd -v
+```

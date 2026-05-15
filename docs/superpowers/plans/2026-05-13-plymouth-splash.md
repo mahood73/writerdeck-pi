@@ -141,7 +141,7 @@ git commit -m "feat: add Plymouth WriterDeck theme files"
 Find line 585 (the `required_packages=` line) and add `plymouth` to the string:
 
 ```sh
-required_packages="wordgrinder-ncurses cage foot labwc wlopm swayidle syncthing tailscale python3 plymouth"
+required_packages="wordgrinder-ncurses cage foot labwc wlopm swayidle python3 plymouth"
 ```
 
 - [ ] **Step 2: Add `configure_cmdline_splash` function**
