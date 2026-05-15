@@ -63,6 +63,7 @@ backup_file_if_missing() {
 # Interactive prompts - get user preferences
 # -----------------------------------------------------------------------------
 
+# MAP-FUNCTIONS-START
 # Map common resolutions to hdmi_mode values (DMT modes)
 get_hdmi_mode() {
   case "$1" in
@@ -87,9 +88,36 @@ hdmi_mode_to_resolution() {
     82)  echo "1280x720" ;;
     35)  echo "1280x1024" ;;
     86)  echo "1920x1080" ;;
-    *)   echo "1280x720" ;;
+    *)   echo "" ;;
   esac
 }
+# MAP-FUNCTIONS-END
+
+# LABEL-FUNCTION-START
+# Returns the resolution prompt header line based on detection source.
+# Args: $1 = configured_res (may be empty), $2 = detected_res (may be empty)
+resolution_prompt_label() {
+  _configured=$1
+  _detected=$2
+  if [ -n "$_configured" ]; then
+    _label=$(hdmi_mode_to_resolution "$_configured")
+    if [ -n "$_label" ]; then
+      echo "HDMI resolution (configured: ${_label}, mode ${_configured}):"
+    else
+      echo "HDMI resolution (configured: mode ${_configured}):"
+    fi
+  elif [ -n "$_detected" ]; then
+    _label=$(hdmi_mode_to_resolution "$_detected")
+    if [ -n "$_label" ]; then
+      echo "HDMI resolution (detected from display: ${_label}, mode ${_detected}):"
+    else
+      echo "HDMI resolution (detected from display: mode ${_detected}):"
+    fi
+  else
+    echo "HDMI resolution (no display detected; suggested: mode 82):"
+  fi
+}
+# LABEL-FUNCTION-END
 
 probe_drm_resolution() {
   for status_file in /sys/class/drm/card*-HDMI-A-*/status; do
@@ -331,7 +359,7 @@ prompt_console_settings() {
   configured_blank=$(probe_configured_consoleblank "$CMDLINE_TXT")
   default_blank=${configured_blank:-$DEFAULT_CONSOLE_BLANK_SECONDS}
 
-  echo "HDMI resolution (current: ${default_res:-unknown}):"
+  resolution_prompt_label "${configured_res:-}" "${detected_res:-}"
   echo "  51 = 1024x600 (WriterDeck panel)"
   echo "  82 = 1280x720 (720p)"
   echo "  86 = 1920x1080 (1080p)"
