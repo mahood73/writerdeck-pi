@@ -88,7 +88,7 @@ hdmi_mode_to_resolution() {
     82)  echo "1280x720" ;;
     35)  echo "1280x1024" ;;
     86)  echo "1920x1080" ;;
-    *)   echo "1280x720" ;;
+    *)   echo "" ;;
   esac
 }
 # MAP-FUNCTIONS-END
@@ -101,10 +101,18 @@ resolution_prompt_label() {
   _detected=$2
   if [ -n "$_configured" ]; then
     _label=$(hdmi_mode_to_resolution "$_configured")
-    echo "HDMI resolution (configured: ${_label}, mode ${_configured}):"
+    if [ -n "$_label" ]; then
+      echo "HDMI resolution (configured: ${_label}, mode ${_configured}):"
+    else
+      echo "HDMI resolution (configured: mode ${_configured}):"
+    fi
   elif [ -n "$_detected" ]; then
     _label=$(hdmi_mode_to_resolution "$_detected")
-    echo "HDMI resolution (detected from display: ${_label}, mode ${_detected}):"
+    if [ -n "$_label" ]; then
+      echo "HDMI resolution (detected from display: ${_label}, mode ${_detected}):"
+    else
+      echo "HDMI resolution (detected from display: mode ${_detected}):"
+    fi
   else
     echo "HDMI resolution (no display detected; suggested: mode 82):"
   fi

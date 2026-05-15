@@ -25,8 +25,9 @@ assert_eq() {
 # Source only the pure helper functions from the installer.
 # We use awk to extract lines between the two sentinel comments.
 # This avoids running sudo/interactive code at source time.
-eval "$(awk '/^# MAP-FUNCTIONS-START$/,/^# MAP-FUNCTIONS-END$/' scripts/install-trixie-lite.sh)"
-eval "$(awk '/^# LABEL-FUNCTION-START$/,/^# LABEL-FUNCTION-END$/' scripts/install-trixie-lite.sh)"
+INSTALLER="$(cd "$(dirname "$0")/.." && pwd)/scripts/install-trixie-lite.sh"
+eval "$(awk '/^# MAP-FUNCTIONS-START$/,/^# MAP-FUNCTIONS-END$/' "$INSTALLER")"
+eval "$(awk '/^# LABEL-FUNCTION-START$/,/^# LABEL-FUNCTION-END$/' "$INSTALLER")"
 
 echo "resolution_prompt_label tests:"
 
@@ -49,6 +50,11 @@ assert_eq "detected writerdeck panel" \
 assert_eq "no display detected" \
   "HDMI resolution (no display detected; suggested: mode 82):" \
   "$(resolution_prompt_label "" "")"
+
+# Case 5: unknown/unrecognized mode — should not show a misleading resolution
+assert_eq "unknown configured mode" \
+  "HDMI resolution (configured: mode 999):" \
+  "$(resolution_prompt_label "999" "")"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
