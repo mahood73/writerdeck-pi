@@ -100,7 +100,8 @@ resolution_prompt_label() {
   _configured=$1
   _detected=$2
   if [ -n "$_configured" ]; then
-    echo "HDMI resolution (configured: mode ${_configured}):"
+    _label=$(hdmi_mode_to_resolution "$_configured")
+    echo "HDMI resolution (configured: ${_label}, mode ${_configured}):"
   elif [ -n "$_detected" ]; then
     _label=$(hdmi_mode_to_resolution "$_detected")
     echo "HDMI resolution (detected from display: ${_label}, mode ${_detected}):"

@@ -32,7 +32,7 @@ echo "resolution_prompt_label tests:"
 
 # Case 1: configured_res is set — takes priority over detected
 assert_eq "configured takes priority" \
-  "HDMI resolution (configured: mode 86):" \
+  "HDMI resolution (configured: 1920x1080, mode 86):" \
   "$(resolution_prompt_label "86" "82")"
 
 # Case 2: no configured, detected is set
