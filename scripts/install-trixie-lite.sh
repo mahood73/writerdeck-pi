@@ -351,7 +351,7 @@ prompt_console_settings() {
   configured_blank=$(probe_configured_consoleblank "$CMDLINE_TXT")
   default_blank=${configured_blank:-$DEFAULT_CONSOLE_BLANK_SECONDS}
 
-  echo "HDMI resolution (current: ${default_res:-unknown}):"
+  echo "$(resolution_prompt_label "${configured_res:-}" "${detected_res:-}")"
   echo "  51 = 1024x600 (WriterDeck panel)"
   echo "  82 = 1280x720 (720p)"
   echo "  86 = 1920x1080 (1080p)"
