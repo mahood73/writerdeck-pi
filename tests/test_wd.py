@@ -303,5 +303,136 @@ class WriterDeckCliTests(unittest.TestCase):
         self.assertIn("error", result.stderr)
 
 
+class WriterDeckVerifyTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name) / "projects"
+        self.root.mkdir()
+        self.config_path = Path(self.tmp.name) / "config.toml"
+
+        # Fake wd-session binary
+        self.fake_session = Path(self.tmp.name) / "wd-session"
+        self.fake_session.write_text("#!/bin/sh\n", encoding="utf-8")
+        self.fake_session.chmod(self.fake_session.stat().st_mode | stat.S_IXUSR)
+
+        # Fake tty1 override.conf with autologin
+        self.fake_override = Path(self.tmp.name) / "override.conf"
+        self.fake_override.write_text(
+            "[Service]\nExecStart=-/sbin/agetty --autologin testuser %I\n",
+            encoding="utf-8",
+        )
+
+        self._write_config("cat")  # 'cat' is always in PATH
+
+    def _write_config(self, editor_command):
+        content = textwrap.dedent(
+            f"""
+            [paths]
+            root = "{self.root}"
+            default_project = "inbox"
+
+            [editor]
+            command = "{editor_command}"
+            """
+        ).strip()
+        self.config_path.write_text(content, encoding="utf-8")
+
+    def _run_verify(self):
+        env = os.environ.copy()
+        env["WD_CONFIG"] = str(self.config_path)
+        env["WD_SESSION_PATH"] = str(self.fake_session)
+        env["WD_TTY1_OVERRIDE_CONF"] = str(self.fake_override)
+        return subprocess.run(
+            [sys.executable, str(WD_BIN), "verify"],
+            env=env,
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+    def test_verify_config_ok(self):
+        result = self._run_verify()
+        self.assertIn("[OK]   config:", result.stdout)
+
+    def test_verify_config_fail_when_missing(self):
+        self.config_path.unlink()
+        result = self._run_verify()
+        self.assertIn("[FAIL] config:", result.stdout)
+        self.assertEqual(result.returncode, 1)
+
+    def test_verify_writing_root_ok(self):
+        result = self._run_verify()
+        self.assertIn("[OK]   writing root:", result.stdout)
+
+    def test_verify_writing_root_fail_when_missing(self):
+        self.root.rmdir()
+        result = self._run_verify()
+        self.assertIn("[FAIL] writing root:", result.stdout)
+        self.assertEqual(result.returncode, 1)
+
+    def test_verify_editor_ok(self):
+        result = self._run_verify()
+        self.assertIn("[OK]   editor:", result.stdout)
+
+    def test_verify_editor_fail_when_not_in_path(self):
+        self._write_config("no_such_editor_xyz_abc")
+        result = self._run_verify()
+        self.assertIn("[FAIL] editor:", result.stdout)
+        self.assertEqual(result.returncode, 1)
+
+    def test_verify_editor_fail_when_command_malformed(self):
+        # Single quote is valid TOML inside a double-quoted string,
+        # but shlex.split raises ValueError on the unterminated quote.
+        self._write_config("nvim 'unterminated")
+        result = self._run_verify()
+        self.assertIn("[FAIL] editor:", result.stdout)
+        self.assertEqual(result.returncode, 1)
+
+    def test_verify_wd_session_ok(self):
+        result = self._run_verify()
+        self.assertIn("[OK]   wd-session:", result.stdout)
+
+    def test_verify_wd_session_fail_when_missing(self):
+        self.fake_session.unlink()
+        result = self._run_verify()
+        self.assertIn("[FAIL] wd-session:", result.stdout)
+        self.assertEqual(result.returncode, 1)
+
+    def test_verify_tty1_autologin_ok(self):
+        result = self._run_verify()
+        self.assertIn("[OK]   tty1 autologin:", result.stdout)
+
+    def test_verify_tty1_autologin_fail_when_file_missing(self):
+        self.fake_override.unlink()
+        result = self._run_verify()
+        self.assertIn("[FAIL] tty1 autologin:", result.stdout)
+        self.assertEqual(result.returncode, 1)
+
+    def test_verify_tty1_autologin_fail_when_no_autologin_directive(self):
+        self.fake_override.write_text("[Service]\nExecStart=-/sbin/agetty %I\n", encoding="utf-8")
+        result = self._run_verify()
+        self.assertIn("[FAIL] tty1 autologin:", result.stdout)
+        self.assertEqual(result.returncode, 1)
+
+    def test_verify_fail_count_in_summary(self):
+        self.fake_session.unlink()
+        self.fake_override.unlink()
+        result = self._run_verify()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("[FAIL] wd-session:", result.stdout)
+        self.assertIn("[FAIL] tty1 autologin:", result.stdout)
+
+    def test_verify_all_controllable_checks_pass(self):
+        result = self._run_verify()
+        # Exclude syncthing line — it may FAIL or SKIP on dev machines
+        fail_lines = [
+            line for line in result.stdout.splitlines()
+            if "[FAIL]" in line and "syncthing" not in line
+        ]
+        self.assertEqual(fail_lines, [], result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

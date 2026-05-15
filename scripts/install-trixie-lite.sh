@@ -93,6 +93,94 @@ hdmi_mode_to_resolution() {
 }
 # MAP-FUNCTIONS-END
 
+# STATUS-FUNCTIONS-START
+status_ok() {
+  printf '  [OK]   %s\n' "$*"
+}
+
+status_fail() {
+  printf '  [FAIL] %s\n' "$*"
+}
+
+# check_file_installed label path
+check_file_installed() {
+  _label=$1
+  _path=$2
+  if [ -f "$_path" ]; then
+    status_ok "$_label: $_path"
+    return 0
+  else
+    status_fail "$_label: $_path not found"
+    return 1
+  fi
+}
+
+# check_dir_installed label path
+check_dir_installed() {
+  _label=$1
+  _path=$2
+  if [ -d "$_path" ]; then
+    status_ok "$_label: $_path"
+    return 0
+  else
+    status_fail "$_label: $_path not found"
+    return 1
+  fi
+}
+
+# check_autologin_configured override_conf_path
+check_autologin_configured() {
+  _path=$1
+  if [ ! -f "$_path" ]; then
+    status_fail "tty1 autologin: $_path not found"
+    return 1
+  fi
+  if grep -q -- '--autologin' "$_path" 2>/dev/null; then
+    status_ok "tty1 autologin: $_path"
+    return 0
+  fi
+  status_fail "tty1 autologin: --autologin not found in $_path"
+  return 1
+}
+# STATUS-FUNCTIONS-END
+
+show_status() {
+  echo ""
+  echo "WriterDeck installation status:"
+  _fails=0
+
+  # Required packages
+  _required_pkgs="wordgrinder-ncurses cage foot labwc wlopm swayidle python3 plymouth plymouth-label"
+  for _pkg in $_required_pkgs; do
+    if dpkg-query -W -f='${Status}' "$_pkg" 2>/dev/null | grep -q '^install ok installed$'; then
+      status_ok "package: $_pkg"
+    else
+      status_fail "package: $_pkg"
+      _fails=$((_fails + 1))
+    fi
+  done
+
+  check_file_installed "config" "$CONFIG_PATH" || _fails=$((_fails + 1))
+  check_file_installed "wd" "/usr/local/bin/wd" || _fails=$((_fails + 1))
+  check_file_installed "wd-session" "/usr/local/bin/wd-session" || _fails=$((_fails + 1))
+  check_file_installed "wd-menu" "/usr/local/bin/wd-menu" || _fails=$((_fails + 1))
+  check_file_installed "wd-labwc-session" "/usr/local/bin/wd-labwc-session" || _fails=$((_fails + 1))
+  check_file_installed "wd-export script" "/usr/local/scripts/wd-export.lua" || _fails=$((_fails + 1))
+  check_file_installed "profile script" "/etc/profile.d/wd-session.sh" || _fails=$((_fails + 1))
+  check_autologin_configured \
+    "/etc/systemd/system/getty@tty1.service.d/override.conf" || _fails=$((_fails + 1))
+  check_dir_installed "plymouth theme" \
+    "/usr/share/plymouth/themes/writerdeck" || _fails=$((_fails + 1))
+
+  echo ""
+  if [ "$_fails" -eq 0 ]; then
+    echo "All checks passed."
+  else
+    echo "$_fails check(s) failed."
+  fi
+  return "$_fails"
+}
+
 # LABEL-FUNCTION-START
 # Returns the resolution prompt header line based on detection source.
 # Args: $1 = configured_res (may be empty), $2 = detected_res (may be empty)
@@ -688,6 +776,20 @@ install_plymouth_splash() {
 # -----------------------------------------------------------------------------
 # Main flow
 # -----------------------------------------------------------------------------
+
+# Parse flags
+STATUS_MODE=false
+for _arg in "$@"; do
+  case "$_arg" in
+    --status) STATUS_MODE=true ;;
+    *) ;;
+  esac
+done
+
+if [ "$STATUS_MODE" = "true" ]; then
+  show_status
+  exit $?
+fi
 
 # If we need sudo and don't have it, request it for the rest of the script
 if [ "$NEEDS_SUDO" = "true" ]; then
