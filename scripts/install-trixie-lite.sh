@@ -150,7 +150,7 @@ show_status() {
   _fails=0
 
   # Required packages
-  _required_pkgs="wordgrinder-ncurses cage foot labwc wlopm python3 plymouth plymouth-label"
+  _required_pkgs="wordgrinder-ncurses cage foot labwc wlopm swayidle python3 plymouth plymouth-label"
   for _pkg in $_required_pkgs; do
     if dpkg-query -W -f='${Status}' "$_pkg" 2>/dev/null | grep -q '^install ok installed$'; then
       status_ok "package: $_pkg"
@@ -164,6 +164,8 @@ show_status() {
   check_file_installed "wd" "/usr/local/bin/wd" || _fails=$((_fails + 1))
   check_file_installed "wd-session" "/usr/local/bin/wd-session" || _fails=$((_fails + 1))
   check_file_installed "wd-menu" "/usr/local/bin/wd-menu" || _fails=$((_fails + 1))
+  check_file_installed "wd-labwc-session" "/usr/local/bin/wd-labwc-session" || _fails=$((_fails + 1))
+  check_file_installed "wd-export script" "/usr/local/scripts/wd-export.lua" || _fails=$((_fails + 1))
   check_file_installed "profile script" "/etc/profile.d/wd-session.sh" || _fails=$((_fails + 1))
   check_autologin_configured \
     "/etc/systemd/system/getty@tty1.service.d/override.conf" || _fails=$((_fails + 1))

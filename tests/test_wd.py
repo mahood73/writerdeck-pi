@@ -382,6 +382,14 @@ class WriterDeckVerifyTests(unittest.TestCase):
         self.assertIn("[FAIL] editor:", result.stdout)
         self.assertEqual(result.returncode, 1)
 
+    def test_verify_editor_fail_when_command_malformed(self):
+        # Single quote is valid TOML inside a double-quoted string,
+        # but shlex.split raises ValueError on the unterminated quote.
+        self._write_config("nvim 'unterminated")
+        result = self._run_verify()
+        self.assertIn("[FAIL] editor:", result.stdout)
+        self.assertEqual(result.returncode, 1)
+
     def test_verify_wd_session_ok(self):
         result = self._run_verify()
         self.assertIn("[OK]   wd-session:", result.stdout)

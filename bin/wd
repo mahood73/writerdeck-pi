@@ -191,7 +191,10 @@ def _verify_writing_root(cfg: Config) -> tuple[bool | None, str]:
 
 
 def _verify_editor(cfg: Config) -> tuple[bool | None, str]:
-    cmd = shlex.split(cfg.editor_command)
+    try:
+        cmd = shlex.split(cfg.editor_command)
+    except ValueError as exc:
+        return False, f"invalid editor command: {exc}"
     if not cmd:
         return False, "editor command is empty"
     binary = cmd[0]
