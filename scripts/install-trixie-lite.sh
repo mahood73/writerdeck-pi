@@ -703,7 +703,7 @@ esac
 # -----------------------------------------------------------------------------
 
 install_required_packages() {
-  required_packages="wordgrinder-ncurses cage foot labwc wlopm swayidle syncthing tailscale python3 plymouth plymouth-label"
+  required_packages="wordgrinder-ncurses cage foot labwc wlopm swayidle python3 plymouth plymouth-label"
   missing_packages=""
   
   for pkg in $required_packages; do
@@ -748,42 +748,6 @@ render_default_config() {
     "$DEFAULT_CONFIG_PATH" > "$destination"
 }
 
-is_managed_sync_writerdeck_config() {
-  config_path=$1
-
-  [ -f "$config_path" ] || return 1
-  grep -q "^root = \"$TARGET_HOME/Sync/WriterDeck\"$" "$config_path" || return 1
-  grep -q '^default_project = "inbox"$' "$config_path" || return 1
-  grep -q '^command = "wordgrinder"$' "$config_path" || return 1
-  grep -q '^folder_id = "writing"$' "$config_path" || return 1
-  grep -q '^mode = "single_writer"$' "$config_path" || return 1
-  return 0
-}
-
-is_managed_legacy_config() {
-  config_path=$1
-
-  [ -f "$config_path" ] || return 1
-  grep -q "^root = \"$TARGET_HOME/writing/projects\"$" "$config_path" || return 1
-  grep -q '^default_project = "inbox"$' "$config_path" || return 1
-  grep -q '^command = "micro"$' "$config_path" || return 1
-  grep -q '^folder_id = "writing"$' "$config_path" || return 1
-  grep -q '^mode = "single_writer"$' "$config_path" || return 1
-  return 0
-}
-
-is_managed_writing_sync_config() {
-  config_path=$1
-
-  [ -f "$config_path" ] || return 1
-  grep -q "^root = \"$TARGET_HOME/Writing\"$" "$config_path" || return 1
-  grep -q '^default_project = "inbox"$' "$config_path" || return 1
-  grep -q '^command = "wordgrinder"$' "$config_path" || return 1
-  grep -q '^folder_id = "writing"$' "$config_path" || return 1
-  grep -q '^mode = "single_writer"$' "$config_path" || return 1
-  return 0
-}
-
 install_config() {
   rendered_default=$(mktemp)
   render_default_config "$rendered_default"
@@ -795,10 +759,7 @@ install_config() {
     return
   fi
 
-  if cmp -s "$DEFAULT_CONFIG_PATH" "$CONFIG_PATH" \
-    || is_managed_sync_writerdeck_config "$CONFIG_PATH" \
-    || is_managed_legacy_config "$CONFIG_PATH" \
-    || is_managed_writing_sync_config "$CONFIG_PATH"; then
+  if cmp -s "$DEFAULT_CONFIG_PATH" "$CONFIG_PATH"; then
     sudo_if_needed install -m 0644 -o "$TARGET_USER" "$CONFIG_PATH" "${CONFIG_PATH}.bak"
     sudo_if_needed install -m 0644 -o "$TARGET_USER" "$rendered_default" "$CONFIG_PATH"
     rm -f "$rendered_default"
@@ -971,11 +932,6 @@ sudo_if_needed install -m 0644 "$REPO_DIR/deploy/profile-wd-session.sh" /etc/pro
 # Enable services
 sudo_if_needed systemctl daemon-reload
 sudo_if_needed systemctl enable getty@tty1.service
-if [ -f /lib/systemd/system/syncthing@.service ] || [ -f /usr/lib/systemd/system/syncthing@.service ]; then
-  sudo_if_needed systemctl enable --now "syncthing@${TARGET_USER}.service"
-else
-  log "warning: syncthing@.service not found; skip enable/start"
-fi
 
 echo ""
 echo "========================================"
@@ -983,11 +939,8 @@ echo "  Installation Complete!"
 echo "========================================"
 echo ""
 echo "Next steps:"
-echo "1) Configure tailscale: tailscale up"
-echo "2) Configure syncthing folder id and devices"
-echo "   (headless: ssh -L 58384:127.0.0.1:8384 ${TARGET_USER}@<deck>)"
-echo "3) Adjust /etc/writerdeck/config.toml if needed"
-echo "4) Reboot for display/console changes to take effect"
+echo "1) Adjust /etc/writerdeck/config.toml if needed"
+echo "2) Reboot for display/console changes to take effect"
 echo ""
 echo "After reboot, tty1 will launch directly into the editor."
 echo "Press Ctrl+Q in the editor to return to the menu."

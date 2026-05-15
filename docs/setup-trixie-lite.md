@@ -13,18 +13,12 @@ The installer prompts for console resolution, rotation, and screen blanking time
 This installs:
 
 - `wordgrinder-ncurses`
-- `cage` + `foot` (Wayland terminal compositor)
-- `syncthing`
-- `tailscale`
+- `labwc`, `cage`, `foot`, `swayidle`, and `wlopm` for the fullscreen writing session
 - WriterDeck scripts and config
 - Foot terminal config at `~/.config/foot/foot.ini`
 - Screen blanking via kernel `consoleblank` (default: 600 seconds)
 
-The installer targets `$SUDO_USER` by default. To install for a different user:
-
-```bash
-WRITERDECK_USER=<username> sudo ./scripts/install-trixie-lite.sh
-```
+The installer targets `$SUDO_USER` by default and prompts for confirmation. To install for a different user, enter that username at the prompt.
 
 **Idempotency:** safe to rerun. Existing config files (`/etc/writerdeck/config.toml`, `~/.config/foot/foot.ini`) are preserved; updated defaults are written alongside as `.dist` files for manual comparison.
 
@@ -109,10 +103,11 @@ sudo systemctl restart getty@tty1
 
 ### Session behaviour
 
-- `tty1` boots into a full-screen `cage` + `foot` Wayland terminal running `wd-session`.
+- `tty1` boots into a full-screen Wayland terminal running `wd-session`.
+- `labwc` is preferred when available because it supports display power management; `cage` remains the fallback compositor.
 - `foot` launches with `--fullscreen` so the terminal fills the display rather than fitting a cell grid.
 - UK keyboard layout is set via `XKB_DEFAULT_LAYOUT=gb`.
-- If `cage` or `foot` is unavailable, the session falls back to raw tty.
+- If the Wayland session cannot start, WriterDeck falls back to raw tty.
 - WordGrinder intercepts some Alt/function-key combinations. If `Alt+F2` does not switch tty while WordGrinder is open, quit to the WriterDeck menu first.
 - `tty2+` is a normal login shell.
 
@@ -122,80 +117,9 @@ sudo systemctl restart getty@tty1
 sudo ./scripts/uninstall-trixie-lite.sh
 ```
 
-This removes the tty1 autologin and session hook, restores backed-up system files, stops and disables `syncthing@<user>.service`, and removes WriterDeck binaries and config. Packages and writing data are left in place.
+This removes the tty1 autologin and session hook, restores backed-up system files, and removes WriterDeck binaries and config. Packages and writing data are left in place.
 
-## 3. Configure Syncthing (Phase 1)
-
-No desktop is needed on the Pi. Access Syncthing via SSH port forwarding.
-
-### 3.1 Verify Syncthing is running
-
-```bash
-sudo systemctl status "syncthing@$(whoami).service"
-```
-
-If not running:
-
-```bash
-sudo systemctl enable --now "syncthing@$(whoami).service"
-```
-
-### 3.2 Open the Syncthing UI via SSH tunnel
-
-From your laptop or desktop (not on the Pi):
-
-```bash
-ssh -L 58384:127.0.0.1:8384 <pi-user>@<writerdeck-ip>
-```
-
-Then open `http://127.0.0.1:58384` in a browser. Keep the SSH session open while configuring.
-
-### 3.3 Configure the WriterDeck folder
-
-In the Syncthing UI on the Pi:
-
-- **Add Folder**
-  - Folder Label: `writing`
-  - Folder ID: `writing` (must match `sync.folder_id` in `/etc/writerdeck/config.toml`)
-  - Folder Path: `/home/<pi-user>/Writing`
-  - Folder Type: `Send Only`
-- **Add Remote Device** — paste your home node device ID and share the `writing` folder.
-
-### 3.4 Configure the home node
-
-Tunnel to the home node if needed:
-
-```bash
-ssh -L 18384:127.0.0.1:8384 <home-user>@<home-node>
-```
-
-In the Syncthing UI on the home node:
-
-- Accept the WriterDeck as a remote device.
-- **Add Folder**
-  - Folder ID: `writing`
-  - Folder Path: your storage path (e.g. `/data/writing` for the Docker template)
-  - Folder Type: `Receive Only`
-  - File Versioning: Staggered, 30-day retention
-
-Once both sides are connected:
-
-```bash
-wd sync status
-wd sync now
-```
-
-## 4. Configure Tailscale
-
-On both the Pi and home node:
-
-```bash
-sudo tailscale up
-```
-
-Use tailnet addresses for connectivity when away from the home LAN.
-
-## 5. Optional firewall
+## 3. Optional firewall
 
 The installer does not configure a firewall. To apply the repo's baseline ruleset:
 
@@ -206,14 +130,13 @@ sudo ./deploy/ufw-writerdeck.sh
 
 Review the CIDR ranges in the script before enabling if your network differs.
 
-## 6. Verification checklist
+## 4. Verification checklist
 
-- Reboot — `tty1` opens into WordGrinder inside `cage` + `foot`.
+- Reboot — `tty1` opens into WordGrinder inside the fullscreen terminal session.
 - Leave idle — display blanks after the configured timeout and wakes on keypress.
-- Quit WordGrinder — menu appears with `w/s/r/p` options.
+- Quit WordGrinder — menu appears with write, export, settings, shell, reboot, and poweroff options.
+- Choose `e` — export menu appears with latest, all drafts, and pick-a-file options.
+- Choose `,` — settings menu appears with screen blank timeout, keyboard layout, and startup mode options.
 - Choose `s` — shell opens. Type `exit` — menu reappears.
 - `wd new` — blank WordGrinder document, save dialog rooted in `~/Writing/inbox`.
 - `wd new notes` — blank WordGrinder document, save dialog rooted in `~/Writing/notes`.
-- `systemctl status syncthing@$(whoami).service` — `active (running)`.
-- `wd sync status` — returns folder status without error.
-- `wd sync now` — completes without timeout.

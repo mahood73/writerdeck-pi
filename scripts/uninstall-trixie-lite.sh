@@ -56,11 +56,6 @@ detect_default_target_user() {
       echo "$detected_user"
       return
     fi
-    detected_user=$(sed -n 's|^root = "/home/\([^/]*\)/Sync/WriterDeck"$|\1|p' "$CONFIG_PATH" | head -1)
-    if [ -n "$detected_user" ]; then
-      echo "$detected_user"
-      return
-    fi
     detected_user=$(sed -n 's|^root = "/home/\([^/]*\)/writing/projects"$|\1|p' "$CONFIG_PATH" | head -1)
     if [ -n "$detected_user" ]; then
       echo "$detected_user"
@@ -115,14 +110,6 @@ prompt_data_removal() {
   if [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/Writing" ]; then
     echo ""
     printf "Remove writing data at %s/Writing too? [y/N]: " "$TARGET_HOME"
-    read -r remove_data_input
-    case "$remove_data_input" in
-      y|Y|yes|Yes) REMOVE_WRITING_DATA=true ;;
-      *) ;;
-    esac
-  elif [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/Sync/WriterDeck" ]; then
-    echo ""
-    printf "Remove writing data at %s/Sync/WriterDeck too? [y/N]: " "$TARGET_HOME"
     read -r remove_data_input
     case "$remove_data_input" in
       y|Y|yes|Yes) REMOVE_WRITING_DATA=true ;;
@@ -386,10 +373,6 @@ show_header
 prompt_target_user
 prompt_data_removal
 
-if [ -n "$TARGET_USER" ] && { [ -f /lib/systemd/system/syncthing@.service ] || [ -f /usr/lib/systemd/system/syncthing@.service ]; }; then
-  sudo_if_needed systemctl disable --now "syncthing@${TARGET_USER}.service" 2>/dev/null || true
-fi
-
 restore_or_remove_console_files
 remove_plymouth_splash
 remove_file_if_present /etc/systemd/system/getty@tty1.service.d/override.conf
@@ -424,9 +407,6 @@ remove_dir_if_empty /etc/writerdeck
 if [ "$REMOVE_WRITING_DATA" = "true" ] && [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/Writing" ]; then
   sudo_if_needed rm -rf "$TARGET_HOME/Writing"
   log "Removed $TARGET_HOME/Writing"
-elif [ "$REMOVE_WRITING_DATA" = "true" ] && [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/Sync/WriterDeck" ]; then
-  sudo_if_needed rm -rf "$TARGET_HOME/Sync/WriterDeck"
-  log "Removed $TARGET_HOME/Sync/WriterDeck"
 elif [ "$REMOVE_WRITING_DATA" = "true" ] && [ -n "${TARGET_HOME:-}" ] && [ -d "$TARGET_HOME/writing" ]; then
   sudo_if_needed rm -rf "$TARGET_HOME/writing"
   log "Removed $TARGET_HOME/writing"
@@ -441,5 +421,5 @@ echo "  Uninstall Complete!"
 echo "========================================"
 echo ""
 echo "WriterDeck tty1 autologin/session hooks have been removed."
-echo "Packages such as wordgrinder-ncurses, cage, foot, syncthing, and tailscale were left installed."
+echo "Packages such as wordgrinder-ncurses, cage, foot, labwc, and plymouth were left installed."
 echo "Reboot if you want the restored console boot settings applied immediately."
