@@ -22,6 +22,14 @@ except ModuleNotFoundError:  # pragma: no cover - Python <3.11 fallback
 
 DEFAULT_CONFIG_PATH = Path("/etc/writerdeck/config.toml")
 
+_WD_SESSION_PATH = Path(os.getenv("WD_SESSION_PATH", "/usr/local/bin/wd-session"))
+_TTY1_AUTOLOGIN_PATH = Path(
+    os.getenv(
+        "WD_TTY1_OVERRIDE_CONF",
+        "/etc/systemd/system/getty@tty1.service.d/override.conf",
+    )
+)
+
 
 class WriterDeckError(RuntimeError):
     """Raised when writerdeck commands cannot complete."""
@@ -166,6 +174,100 @@ def _is_wordgrinder_command(editor_command: str) -> bool:
     return Path(cmd[0]).name in {"wordgrinder", "xwordgrinder"}
 
 
+def _verify_config(config_path: Path) -> tuple[bool | None, str]:
+    try:
+        _load_config(config_path)
+        return True, str(config_path)
+    except WriterDeckError as exc:
+        return False, str(exc)
+
+
+def _verify_writing_root(cfg: Config) -> tuple[bool | None, str]:
+    if not cfg.root.exists():
+        return False, f"{cfg.root} does not exist"
+    if not os.access(cfg.root, os.W_OK):
+        return False, f"{cfg.root} not writable"
+    return True, f"{cfg.root} (writable)"
+
+
+def _verify_editor(cfg: Config) -> tuple[bool | None, str]:
+    cmd = shlex.split(cfg.editor_command)
+    if not cmd:
+        return False, "editor command is empty"
+    binary = cmd[0]
+    found = shutil.which(binary)
+    if found is None:
+        return False, f"{binary} not found in PATH"
+    return True, found
+
+
+def _verify_wd_session() -> tuple[bool | None, str]:
+    path = _WD_SESSION_PATH
+    if path.exists():
+        return True, str(path)
+    return False, f"{path} not found"
+
+
+def _verify_tty1_autologin() -> tuple[bool | None, str]:
+    path = _TTY1_AUTOLOGIN_PATH
+    if not path.exists():
+        return False, f"{path} not found"
+    if "--autologin" in path.read_text(encoding="utf-8"):
+        return True, str(path)
+    return False, "autologin not configured in override.conf"
+
+
+def _verify_syncthing(user: str) -> tuple[bool | None, str]:
+    if shutil.which("systemctl") is None:
+        return None, "systemctl not available"
+    for service in (f"syncthing@{user}.service", "syncthing.service"):
+        r = subprocess.run(
+            ["systemctl", "is-active", "--quiet", service],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if r.returncode == 0:
+            return True, f"{service} active"
+    return False, "syncthing service not running"
+
+
+def cmd_verify(cfg: Config | None, args: argparse.Namespace) -> int:
+    import getpass
+
+    config_path = Path(args.config).expanduser()
+    user = getpass.getuser()
+
+    results: list[tuple[str, bool | None, str]] = [
+        ("config", *_verify_config(config_path)),
+    ]
+    if cfg is not None:
+        results.append(("writing root", *_verify_writing_root(cfg)))
+        results.append(("editor", *_verify_editor(cfg)))
+    results.append(("wd-session", *_verify_wd_session()))
+    results.append(("tty1 autologin", *_verify_tty1_autologin()))
+    results.append(("syncthing", *_verify_syncthing(user)))
+
+    fail_count = 0
+    for label, passed, detail in results:
+        if passed is True:
+            tag = "[OK]  "
+        elif passed is False:
+            tag = "[FAIL]"
+            fail_count += 1
+        else:
+            tag = "[SKIP]"
+        print(f"  {tag} {label}: {detail}")
+
+    print()
+    if fail_count == 0:
+        print("All checks passed.")
+    else:
+        print(f"{fail_count} check(s) failed.")
+
+    return 0 if fail_count == 0 else 1
+
+
 def cmd_open_latest(cfg: Config, _args: argparse.Namespace) -> int:
     latest = _find_latest_draft(cfg.root)
     if latest is None:
@@ -270,6 +372,9 @@ def build_parser() -> argparse.ArgumentParser:
     export_cmd.add_argument("--all", action="store_true", dest="export_all", help="Export all .wg files under the writing root")
     export_cmd.set_defaults(func=cmd_export)
 
+    verify_cmd = subparsers.add_parser("verify", help="Check WriterDeck install state")
+    verify_cmd.set_defaults(func=None)
+
     return parser
 
 
@@ -277,8 +382,17 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
 
+    config_path = Path(args.config).expanduser()
+
+    if args.command == "verify":
+        try:
+            cfg = _load_config(config_path)
+        except WriterDeckError:
+            cfg = None
+        return cmd_verify(cfg, args)
+
     try:
-        cfg = _load_config(Path(args.config).expanduser())
+        cfg = _load_config(config_path)
         return args.func(cfg, args)
     except WriterDeckError as exc:
         print(f"error: {exc}", file=sys.stderr)
