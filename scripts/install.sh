@@ -1055,8 +1055,6 @@ setup_console() {
         log "Set console blanking to $CONSOLE_BLANK_SECONDS seconds in $CMDLINE_TXT"
       fi
     fi
-    configure_config_blank_timeout "$CONFIG_PATH" "$CONSOLE_BLANK_SECONDS"
-    log "Set display blank_timeout to $CONSOLE_BLANK_SECONDS seconds in $CONFIG_PATH"
   fi
 }
 
@@ -1069,7 +1067,11 @@ backup_file_if_missing "$CONFIG_PATH" etc/writerdeck/config.toml
 setup_writing_folder
 install_config
 install_user_foot_config
-setup_console
+if is_pi; then
+  setup_console
+fi
+configure_config_blank_timeout "$CONFIG_PATH" "$CONSOLE_BLANK_SECONDS"
+log "Set display blank_timeout to $CONSOLE_BLANK_SECONDS seconds in $CONFIG_PATH"
 install_plymouth_splash
 # Ensure TARGET_USER can edit the config (settings menu writes it directly).
 # Must run after all install steps that write to CONFIG_PATH.
