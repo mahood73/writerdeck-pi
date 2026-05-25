@@ -473,61 +473,63 @@ prompt_console_settings() {
   echo "  Press Enter to keep the current setting shown in brackets."
   echo ""
 
-  configured_res=$(probe_configured_resolution "$CMDLINE_TXT" "$CONFIG_TXT")
-  detected_res=$(probe_resolution)
-  DETECTED_RESOLUTION=${configured_res:-$detected_res}
-  default_res=${configured_res:-${detected_res:-82}}
-
-  configured_rotate=$(probe_configured_rotation "$CMDLINE_TXT" "$CONFIG_TXT")
-  default_rotate=${configured_rotate:-0}
-
   configured_blank=$(probe_configured_consoleblank "$CMDLINE_TXT")
   default_blank=${configured_blank:-$DEFAULT_CONSOLE_BLANK_SECONDS}
 
-  resolution_prompt_label "${configured_res:-}" "${detected_res:-}"
-  echo "  51 = 1024x600 (WriterDeck panel)"
-  echo "  82 = 1280x720 (720p)"
-  echo "  86 = 1920x1080 (1080p)"
-  echo "  0  = skip (use current)"
-  while :; do
-    printf "Choice [%s]: " "$default_res"
-    read -r res_input
-    if [ -z "$res_input" ]; then
-      CONSOLE_RESOLUTION="$default_res"
-    else
-      CONSOLE_RESOLUTION=$res_input
-    fi
+  if is_pi; then
+    configured_res=$(probe_configured_resolution "$CMDLINE_TXT" "$CONFIG_TXT")
+    detected_res=$(probe_resolution)
+    DETECTED_RESOLUTION=${configured_res:-$detected_res}
+    default_res=${configured_res:-${detected_res:-82}}
 
-    if is_supported_resolution "$CONSOLE_RESOLUTION"; then
-      break
-    fi
+    configured_rotate=$(probe_configured_rotation "$CMDLINE_TXT" "$CONFIG_TXT")
+    default_rotate=${configured_rotate:-0}
 
-    echo "Please choose one of: 0, 51, 82, or 86."
-  done
-  
-  echo ""
-  echo "Physical screen orientation:"
-  echo "  Choose how the display is mounted right now."
-  echo "  The installer will rotate the console to match."
-  echo "  0 = mounted normally"
-  echo "  1 = display is turned 90 degrees clockwise"
-  echo "  2 = display is upside down"
-  echo "  3 = display is turned 90 degrees anti-clockwise"
-  while :; do
-    printf "Choice [%s]: " "$default_rotate"
-    read -r rot_input
-    if [ -z "$rot_input" ]; then
-      CONSOLE_ROTATE=$default_rotate
-    else
-      CONSOLE_ROTATE=$rot_input
-    fi
+    resolution_prompt_label "${configured_res:-}" "${detected_res:-}"
+    echo "  51 = 1024x600 (WriterDeck panel)"
+    echo "  82 = 1280x720 (720p)"
+    echo "  86 = 1920x1080 (1080p)"
+    echo "  0  = skip (use current)"
+    while :; do
+      printf "Choice [%s]: " "$default_res"
+      read -r res_input
+      if [ -z "$res_input" ]; then
+        CONSOLE_RESOLUTION="$default_res"
+      else
+        CONSOLE_RESOLUTION=$res_input
+      fi
 
-    if is_supported_rotation "$CONSOLE_ROTATE"; then
-      break
-    fi
+      if is_supported_resolution "$CONSOLE_RESOLUTION"; then
+        break
+      fi
 
-    echo "Please choose one of: 0, 1, 2, or 3."
-  done
+      echo "Please choose one of: 0, 51, 82, or 86."
+    done
+
+    echo ""
+    echo "Physical screen orientation:"
+    echo "  Choose how the display is mounted right now."
+    echo "  The installer will rotate the console to match."
+    echo "  0 = mounted normally"
+    echo "  1 = display is turned 90 degrees clockwise"
+    echo "  2 = display is upside down"
+    echo "  3 = display is turned 90 degrees anti-clockwise"
+    while :; do
+      printf "Choice [%s]: " "$default_rotate"
+      read -r rot_input
+      if [ -z "$rot_input" ]; then
+        CONSOLE_ROTATE=$default_rotate
+      else
+        CONSOLE_ROTATE=$rot_input
+      fi
+
+      if is_supported_rotation "$CONSOLE_ROTATE"; then
+        break
+      fi
+
+      echo "Please choose one of: 0, 1, 2, or 3."
+    done
+  fi
 
   echo ""
   echo "Console blanking timeout in seconds:"
@@ -853,8 +855,10 @@ prompt_writing_folder
 
 echo ""
 echo "Configuration:"
-echo "  Resolution: $CONSOLE_RESOLUTION"
-echo "  Screen orientation: $CONSOLE_ROTATE"
+if is_pi; then
+  echo "  Resolution: $CONSOLE_RESOLUTION"
+  echo "  Screen orientation: $CONSOLE_ROTATE"
+fi
 echo "  Screen blanking: $CONSOLE_BLANK_SECONDS seconds"
 echo "  Writing folder: $WRITING_ROOT"
 echo ""
