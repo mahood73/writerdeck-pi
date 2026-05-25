@@ -2,7 +2,7 @@
 
 # WriterDeck
 
-A distraction-free writing appliance for Raspberry Pi Zero 2W running Debian 13 (Trixie) Lite.
+A distraction-free writing appliance built on Debian. Primarily targets the Raspberry Pi Zero 2W; also works on any Debian machine (x86, ARM, or otherwise) — handy for testing before buying hardware.
 
 Boot the Pi and you're straight into WordGrinder. Quit and a small menu offers writing, export, settings, shell, reboot, and poweroff actions.
 
@@ -16,14 +16,14 @@ Boot the Pi and you're straight into WordGrinder. Quit and a small menu offers w
 | `bin/wd-session`                   | tty1 session supervisor (editor → menu loop) |
 | `config/config.toml`               | Default config                               |
 | `deploy/`                          | Autologin, terminal, and firewall templates  |
-| `scripts/install-trixie-lite.sh`   | Installer                                    |
-| `scripts/uninstall-trixie-lite.sh` | Uninstaller                                  |
+| `scripts/install.sh`   | Installer                                    |
+| `scripts/uninstall.sh` | Uninstaller                                  |
 | `tests/test_wd.py`                 | CLI tests                                    |
 
 ## Quick start
 
-1. Read [docs/setup-trixie-lite.md](docs/setup-trixie-lite.md).
-2. Run `sudo ./scripts/install-trixie-lite.sh` on the Pi.
+1. Read [docs/setup.md](docs/setup.md).
+2. Run `sudo ./scripts/install.sh` on the device.
 3. Reboot — `tty1` opens directly into WordGrinder.
 
 ## CLI

@@ -50,7 +50,7 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 # Source only the pure helper functions from the installer.
 # We use awk to extract lines between the two sentinel comments.
 # This avoids running sudo/interactive code at source time.
-INSTALLER="$(cd "$(dirname "$0")/.." && pwd)/scripts/install-trixie-lite.sh"
+INSTALLER="$(cd "$(dirname "$0")/.." && pwd)/scripts/install.sh"
 eval "$(awk '/^# STATUS-FUNCTIONS-START$/,/^# STATUS-FUNCTIONS-END$/' "$INSTALLER")"
 
 echo "check_file_installed tests:"

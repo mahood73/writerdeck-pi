@@ -25,7 +25,7 @@ assert_eq() {
 # Source only the pure helper functions from the installer.
 # We use awk to extract lines between the two sentinel comments.
 # This avoids running sudo/interactive code at source time.
-INSTALLER="$(cd "$(dirname "$0")/.." && pwd)/scripts/install-trixie-lite.sh"
+INSTALLER="$(cd "$(dirname "$0")/.." && pwd)/scripts/install.sh"
 eval "$(awk '/^# MAP-FUNCTIONS-START$/,/^# MAP-FUNCTIONS-END$/' "$INSTALLER")"
 eval "$(awk '/^# LABEL-FUNCTION-START$/,/^# LABEL-FUNCTION-END$/' "$INSTALLER")"
 

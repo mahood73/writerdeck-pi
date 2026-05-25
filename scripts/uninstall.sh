@@ -1,7 +1,7 @@
 #!/bin/sh
 #
-# WriterDeck uninstaller for Raspberry Pi Zero 2W on Debian Trixie Lite.
-# Run as: ./uninstall-trixie-lite.sh  (uses sudo for privileged operations)
+# WriterDeck uninstaller for Debian (Raspberry Pi primary, any Debian machine supported).
+# Run as: sudo ./scripts/uninstall.sh
 #
 
 set -eu

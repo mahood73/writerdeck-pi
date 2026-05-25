@@ -1,7 +1,7 @@
 #!/bin/sh
 #
-# WriterDeck installation script for Raspberry Pi Zero 2W on Debian Trixie Lite.
-# Run as: ./install-trixie-lite.sh  (uses sudo for privileged operations)
+# WriterDeck installation script for Debian (Raspberry Pi primary, any Debian machine supported).
+# Run as: sudo ./scripts/install.sh
 #
 
 set -eu
