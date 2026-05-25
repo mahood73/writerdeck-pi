@@ -1,14 +1,19 @@
-# Setup: Debian 13 (Trixie) Lite on Pi Zero 2W
+# Setup: WriterDeck on Debian
+
+WriterDeck runs on any Debian machine. The installer detects the platform and applies hardware-specific steps automatically.
+
+- **Raspberry Pi Zero 2W** — full path including HDMI mode, display rotation, Pi boot config, and Plymouth splash
+- **Any other Debian machine** — same packages and session stack; skips boot config; Plymouth splash uses GRUB
 
 ## 1. Base install
 
-Flash Debian 13 (Trixie) Lite, boot with keyboard and HDMI attached, then clone this repo on the device and run:
+Clone this repo on the device and run:
 
 ```bash
-sudo ./scripts/install-trixie-lite.sh
+sudo ./scripts/install.sh
 ```
 
-The installer prompts for console resolution, rotation, and screen blanking timeout. On reruns it detects existing values and preserves them where possible.
+The installer prompts for your writing folder and screen blanking timeout. On Raspberry Pi it also prompts for console resolution and rotation. On reruns it detects existing values and preserves them where possible.
 
 This installs:
 
@@ -16,13 +21,14 @@ This installs:
 - `labwc`, `cage`, `foot`, `swayidle`, and `wlopm` for the fullscreen writing session
 - WriterDeck scripts and config
 - Foot terminal config at `~/.config/foot/foot.ini`
-- Screen blanking via kernel `consoleblank` (default: 600 seconds)
+- Screen blanking via swayidle (default: 600 seconds)
+- Plymouth splash screen
 
 The installer targets `$SUDO_USER` by default and prompts for confirmation. To install for a different user, enter that username at the prompt.
 
 **Idempotency:** safe to rerun. Existing config files (`/etc/writerdeck/config.toml`, `~/.config/foot/foot.ini`) are preserved; updated defaults are written alongside as `.dist` files for manual comparison.
 
-### WordGrinder 0.9 (optional)
+### Raspberry Pi only: WordGrinder 0.9 (optional)
 
 The installer pulls WordGrinder 0.8 from the Trixie package archive. That is sufficient for normal use. WordGrinder 0.9 exists upstream but is not packaged — only build it from source if a specific 0.9 fix is needed.
 
@@ -114,7 +120,7 @@ sudo systemctl restart getty@tty1
 ### Uninstalling
 
 ```bash
-sudo ./scripts/uninstall-trixie-lite.sh
+sudo ./scripts/uninstall.sh
 ```
 
 This removes the tty1 autologin and session hook, restores backed-up system files, and removes WriterDeck binaries and config. Packages and writing data are left in place.
