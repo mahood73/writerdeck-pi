@@ -769,23 +769,27 @@ install_plymouth_splash() {
     log "Installed initramfs hook at $HOOK_DEST"
   fi
 
-  if [ -n "$LOCAL_CONFIG_TXT" ]; then
-    backup_file_if_missing "$LOCAL_CONFIG_TXT" "${LOCAL_CONFIG_TXT#/}"
-    set_config_key "$LOCAL_CONFIG_TXT" "disable_splash" "1"
-    log "Set disable_splash=1 in $LOCAL_CONFIG_TXT"
-    set_config_key "$LOCAL_CONFIG_TXT" "framebuffer_width" "1024"
-    set_config_key "$LOCAL_CONFIG_TXT" "framebuffer_height" "600"
-    log "Set framebuffer_width=1024 framebuffer_height=600 in $LOCAL_CONFIG_TXT"
-  fi
+  if is_pi; then
+    if [ -n "$LOCAL_CONFIG_TXT" ]; then
+      backup_file_if_missing "$LOCAL_CONFIG_TXT" "${LOCAL_CONFIG_TXT#/}"
+      set_config_key "$LOCAL_CONFIG_TXT" "disable_splash" "1"
+      log "Set disable_splash=1 in $LOCAL_CONFIG_TXT"
+      set_config_key "$LOCAL_CONFIG_TXT" "framebuffer_width" "1024"
+      set_config_key "$LOCAL_CONFIG_TXT" "framebuffer_height" "600"
+      log "Set framebuffer_width=1024 framebuffer_height=600 in $LOCAL_CONFIG_TXT"
+    fi
 
-  if [ -n "$LOCAL_CMDLINE_TXT" ]; then
-    backup_file_if_missing "$LOCAL_CMDLINE_TXT" "${LOCAL_CMDLINE_TXT#/}"
-    if configure_cmdline_remove_serial_console "$LOCAL_CMDLINE_TXT"; then
-      log "Removed serial console from $LOCAL_CMDLINE_TXT"
+    if [ -n "$LOCAL_CMDLINE_TXT" ]; then
+      backup_file_if_missing "$LOCAL_CMDLINE_TXT" "${LOCAL_CMDLINE_TXT#/}"
+      if configure_cmdline_remove_serial_console "$LOCAL_CMDLINE_TXT"; then
+        log "Removed serial console from $LOCAL_CMDLINE_TXT"
+      fi
+      if configure_cmdline_splash "$LOCAL_CMDLINE_TXT"; then
+        log "Added quiet splash vt.global_cursor_default=0 to $LOCAL_CMDLINE_TXT"
+      fi
     fi
-    if configure_cmdline_splash "$LOCAL_CMDLINE_TXT"; then
-      log "Added quiet splash vt.global_cursor_default=0 to $LOCAL_CMDLINE_TXT"
-    fi
+  else
+    configure_grub_splash
   fi
 
   sudo_if_needed /usr/sbin/plymouth-set-default-theme writerdeck
@@ -807,7 +811,6 @@ install_plymouth_splash() {
     log "Set MODULES=most in $INITRAMFS_CONF (required for early Plymouth display)"
   fi
   log "Rebuilding initramfs to apply Plymouth theme — this takes a few minutes."
-  log "(Note: apt already rebuilt it once per installed kernel above; this final rebuild applies the theme.)"
   sudo_if_needed update-initramfs -u
   log "Plymouth splash screen configured."
 }
