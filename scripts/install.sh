@@ -842,6 +842,11 @@ fi
 
 # Run interactive prompts as current user
 show_header
+if is_pi; then
+  echo "  Platform: Raspberry Pi"
+else
+  echo "  Platform: generic Debian"
+fi
 prompt_target_user
 
 # Resolve target user's home directory
