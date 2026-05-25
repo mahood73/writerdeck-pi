@@ -144,10 +144,47 @@ check_autologin_configured() {
 }
 # STATUS-FUNCTIONS-END
 
+# PLATFORM-FUNCTIONS-START
+is_pi() {
+  _model_file="${PLATFORM_MODEL_FILE:-/proc/device-tree/model}"
+  [ -f "$_model_file" ] && grep -qi "raspberry pi" "$_model_file" 2>/dev/null
+}
+
+check_platform() {
+  if is_pi; then
+    status_ok "platform: Raspberry Pi"
+  else
+    status_ok "platform: generic Debian"
+  fi
+}
+
+configure_grub_splash() {
+  _grub_conf="${GRUB_CONF_FILE:-/etc/default/grub}"
+  if [ ! -f "$_grub_conf" ]; then
+    log "No GRUB config found at $_grub_conf; skipping GRUB splash setup"
+    return 0
+  fi
+  if grep -q 'splash' "$_grub_conf" 2>/dev/null; then
+    log "GRUB splash params already present in $_grub_conf"
+    return 0
+  fi
+  _tmp=$(mktemp)
+  sed 's/^\(GRUB_CMDLINE_LINUX_DEFAULT="[^"]*\)"/\1 quiet splash vt.global_cursor_default=0"/' \
+    "$_grub_conf" > "$_tmp"
+  sudo_if_needed install -m 0644 "$_tmp" "$_grub_conf"
+  rm -f "$_tmp"
+  log "Added splash params to GRUB_CMDLINE_LINUX_DEFAULT in $_grub_conf"
+  sudo_if_needed update-grub
+  log "Ran update-grub"
+}
+# PLATFORM-FUNCTIONS-END
+
 show_status() {
   echo ""
   echo "WriterDeck installation status:"
   _fails=0
+
+  check_platform
 
   # Required packages
   _required_pkgs="wordgrinder-ncurses cage foot labwc wlopm swayidle python3 plymouth plymouth-label"
